@@ -1,0 +1,128 @@
+[
+  {
+    "key": "http",
+    "name": "HttpRedirect",
+    "field": "url",
+    "type": "redirect",
+    "description": "Recommended. Simple and the most reliable redirect (302)"
+  },
+  {
+    "key": "meta",
+    "name": "Meta",
+    "field": "url",
+    "type": "redirect",
+    "description": "Redirects by using 'meta' HTML tag"
+  },
+  {
+    "key": "js",
+    "name": "Js",
+    "field": "url",
+    "type": "redirect",
+    "description": "Use JS to perform redirect"
+  },
+  {
+    "key": "blank_referrer",
+    "name": "BlankReferrer",
+    "field": "url",
+    "type": "redirect",
+    "description": "Redirect that doesn't send Referer"
+  },
+  {
+    "key": "curl",
+    "name": "Curl",
+    "field": "url",
+    "type": "redirect",
+    "description": "Help to load external page without actual redirecting"
+  },
+  {
+    "key": "double_meta",
+    "name": "DoubleMeta",
+    "field": "url",
+    "type": "redirect",
+    "description": "Two-step redirect that helps to hide the source from the destination website"
+  },
+  {
+    "key": "formsubmit",
+    "name": "FormSubmit",
+    "field": "url",
+    "type": "redirect",
+    "description": "The way to perform redirect with POST-data"
+  },
+  {
+    "key": "iframe",
+    "name": "Iframe",
+    "field": "url",
+    "type": "redirect",
+    "description": "Show page in a iframe"
+  },
+  {
+    "key": "campaign",
+    "name": "ToCampaign",
+    "field": "campaigns",
+    "type": "other",
+    "description": "Send to another campaign (duplicates clicks for every campaign)"
+  },
+  {
+    "key": "status404",
+    "name": "Status404",
+    "field": "nothing",
+    "type": "other",
+    "description": "Show blank page with error '404 Not Found'"
+  },
+  {
+    "key": "show_text",
+    "name": "ShowText",
+    "field": "text",
+    "type": "other",
+    "description": "Show plain text content"
+  },
+  {
+    "key": "show_html",
+    "name": "ShowHtml",
+    "field": "text",
+    "type": "other",
+    "description": "Show HTML content"
+  },
+  {
+    "key": "do_nothing",
+    "name": "DoNothing",
+    "field": "nothing",
+    "type": "other",
+    "description": "Just leave the user where he is now"
+  },
+  {
+    "key": "remote",
+    "name": "Remote",
+    "field": "url",
+    "type": "redirect",
+    "description": "Two-step action: load the page content, then use it as the next URL for redirecting"
+  },
+  {
+    "key": "frame",
+    "name": "Frame",
+    "field": "url",
+    "type": "redirect",
+    "description": "Show page in a frameset"
+  },
+  {
+    "key": "js_for_script",
+    "name": "JsForScript",
+    "field": "url",
+    "type": "redirect",
+    "description": "Use \"JS redirect\" instead"
+  },
+  {
+    "key": "js_for_iframe",
+    "name": "JsForIframe",
+    "field": "url",
+    "type": "redirect",
+    "description": "Use \"JS redirect\" instead"
+  },
+  {
+    "key": "local_file",
+    "name": "LocalFile",
+    "field": "upload",
+    "type": "hidden",
+    "description": ""
+  }
+]

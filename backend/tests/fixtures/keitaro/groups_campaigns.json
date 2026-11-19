@@ -1,0 +1,20 @@
+[
+  {
+    "id": 9799,
+    "name": "VZ adrobot test",
+    "position": 9282,
+    "type": "campaigns"
+  },
+  {
+    "id": 10296,
+    "name": "test_malkov_group",
+    "position": 9428,
+    "type": "campaigns"
+  },
+  {
+    "id": 10302,
+    "name": "test_manyahin_group",
+    "position": 9430,
+    "type": "campaigns"
+  }
+]

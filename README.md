@@ -2,7 +2,7 @@
 
 Веб-обёртка над Keitaro Admin API: создание кампаний с двумя потоками и редактирование офферов (ТЗ v2.3).
 
-**Статус: скелет.** Работает: Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro и проверка ключа, frontend с двумя пустыми вкладками. Бизнес-логики пока нет (см. «Что дальше»).
+**Статус:** каркас и Phase 0 (GET-часть). Работает: Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro, скрипт сверки контракта Keitaro, frontend с двумя пустыми вкладками. Бизнес-логики (создание кампаний, редактор офферов) пока нет. Что сделано по пунктам ТЗ: раздел «Статус реализации» в самом ТЗ.
 
 ## Технологии
 
@@ -21,7 +21,10 @@ backend/
   app/core/errors.py      единый формат ошибки {code, message, details?}
   app/services/keitaro_client.py   ЕДИНСТВЕННАЯ точка входа в Keitaro
   alembic/                миграции (0001 пока пустая)
-  tests/
+  scripts/keitaro_discovery.py     Phase 0: сверка контракта Keitaro (только GET)
+  tests/                  pytest; tests/fixtures/keitaro/ создаётся discovery-скриптом
+  pytest.ini
+docs/keitaro_contract.md  генерируется discovery-скриптом
 frontend/                 Vite + React, в Docker отдаётся через nginx
 ```
 
@@ -109,13 +112,45 @@ docker compose run --rm --no-deps backend pytest
 # или локально: cd backend && pytest
 ```
 
-Keitaro в тестах мокается (`respx`), реальный ключ не нужен.
+Keitaro в тестах мокается (`respx`), реальный ключ не нужен. Покрыто: клиент Keitaro (нормализация ошибок, повторы только для GET), Basic auth и fail-closed старт, discovery-скрипт (отчёт, фикстуры, отсутствие секретов в выводе).
 
-## Что дальше (ТЗ §13)
+## Phase 0: сверка с вашим Keitaro
 
-1. `scripts/keitaro_discovery.py` (только GET) и Phase 0: `docs/keitaro_contract.md` + фикстуры. Разделы про версию Keitaro и особенности API появятся здесь после него.
-2. `share_calculator` с тестами из Приложения C.
-3. Справочники, создание кампании, Fetch, редактирование, Upload.
+Скрипт `backend/scripts/keitaro_discovery.py` только читает данные (GET), в трекере ничего не создаёт и не меняет. Он проверяет по ТЗ §2.3 всё, что можно проверить чтением, сохраняет обезличенные ответы в `backend/tests/fixtures/keitaro/` и пишет отчёт `docs/keitaro_contract.md`.
+
+```bash
+# вариант 1: Docker (файлы попадут прямо в репозиторий)
+docker compose run --rm --no-deps -v "${PWD}:/repo" -w /repo/backend backend python -m scripts.keitaro_discovery
+
+# вариант 2: локально (venv из «Запуск без Docker»)
+cd backend
+set -a; . ../.env; set +a
+python -m scripts.keitaro_discovery
+```
+
+Параметры: `--campaign-id ID` (кампания-эталон: её потоки смотрятся первыми), `--scan N` (сколько кампаний просмотреть в поисках потоков, по умолчанию 20). На Linux после запуска через Docker файлы принадлежат root: `sudo chown -R $USER: docs backend/tests/fixtures`.
+
+Как читать `docs/keitaro_contract.md`: в начале таблица по 14 пунктам ТЗ §2.3.
+
+| Статус | Значение |
+|---|---|
+| ✅ подтверждено | ответ Keitaro совпал с ожиданием ТЗ |
+| 🟡 / ⏳ | нужна проверка записью (`--allow-write`, пока не реализован: он создаёт и архивирует кампании в трекере) |
+| ✋ вручную | версия Keitaro и Tracking Method: смотри в админке, в отчёте есть подсказки |
+| ⚠️ не подтвердилось | смотри детали пункта: чаще всего в трекере нет подходящих кампаний |
+
+Пункты 3 и 4 (куда класть URL редиректа, `action_type` у потока с офферами) подтверждаются по существующим кампаниям. Если среди просмотренных нет потока `redirect` или `landings`, создай в UI Keitaro кампанию-эталон с такими потоками и запусти с `--campaign-id`.
+
+**Перед коммитом фикстур.** `token` кампаний и все URL в `action_options`/`action_payload` заменяются на `REDACTED`, списки режутся до 3 элементов, но названия кампаний, офферов и доменов остаются как есть. Если репозиторий публичный, просмотри `backend/tests/fixtures/keitaro/`.
+
+## Особенности Keitaro API (кратко, подробности в ТЗ, Приложение A)
+
+- Ключ в заголовке `Api-Key`, базовый путь `/admin_api/v1/`.
+- Ошибки приходят по-разному: HTTP 200/400 с `{"error": ...}`, 406/422 с `{поле: [сообщения]}`, 402 означает, что Admin API нет в редакции. Клиент приводит всё к одному виду.
+- `GET /offers` отдаёт весь каталог без фильтров и страниц; `GET /groups` требует `type`.
+- `PUT /streams/{id}` с `offers` декларативный: пропущенные офферы удаляются.
+- `POST /campaigns` не идемпотентен, поэтому клиент не повторяет POST/PUT/DELETE автоматически.
+- Версия Keitaro и результаты проверки на вашем трекере появятся в `docs/keitaro_contract.md` после запуска скрипта.
 
 ## Предупреждение
 

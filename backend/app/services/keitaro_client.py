@@ -25,8 +25,9 @@ class KeitaroClient:
             timeout=httpx.Timeout(30, connect=5),
         )
 
-    def request(self, method: str, path: str, *, params=None, json=None):
-        attempts = 3 if method == "GET" else 1  # POST/PUT/DELETE не повторяем: POST /campaigns создаст дубль
+    def request(self, method: str, path: str, *, params=None, json=None, expect_json: bool = True):
+        """expect_json=False: любой 2xx = успех, тело не разбираем (DELETE, restore)."""
+        attempts = 3 if method == "GET" else 1  # POST/PUT/DELETE не повторяем
         for i in range(attempts):
             last = i == attempts - 1
             try:
@@ -37,10 +38,10 @@ class KeitaroClient:
                 continue
             if r.status_code >= 500 and not last:
                 continue
-            return self._parse(r)
+            return self._parse(r, expect_json=expect_json)
 
     @staticmethod
-    def _parse(r: httpx.Response):
+    def _parse(r: httpx.Response, *, expect_json: bool = True):
         s = r.status_code
         if s in (401, 402, 403):
             raise AppError("KEITARO_AUTH", _AUTH_MSG, 502)
@@ -48,13 +49,14 @@ class KeitaroClient:
             raise AppError("KEITARO_NOT_FOUND", "Keitaro: объект не найден", 404)
         if s >= 500 or (s >= 400 and s not in (400, 406, 422)):
             raise AppError("KEITARO_BAD_RESPONSE", f"Keitaro вернул ошибку {s}", 502)
+        if 200 <= s < 300 and not expect_json:
+            return None
         try:
             body = r.json()
         except ValueError:
             raise AppError(
                 "KEITARO_BAD_RESPONSE", "Ответ Keitaro не JSON: проверьте KEITARO_BASE_URL (без /admin)", 502
             ) from None
-        # ошибка бывает и как HTTP 200/400 с {"error": ...}, и как 406/422 с {поле: [сообщения]}
         if s >= 400 or (isinstance(body, dict) and "error" in body):
             raise AppError("KEITARO_VALIDATION", _message(body), 422)
         return body

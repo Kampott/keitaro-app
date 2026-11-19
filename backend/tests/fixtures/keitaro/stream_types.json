@@ -1,0 +1,14 @@
+[
+  {
+    "value": "regular",
+    "name": "Regular"
+  },
+  {
+    "value": "default",
+    "name": "Default"
+  },
+  {
+    "value": "forced",
+    "name": "Forced"
+  }
+]

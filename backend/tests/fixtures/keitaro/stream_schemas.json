@@ -1,0 +1,17 @@
+[
+  {
+    "value": "landings",
+    "name": "Landing pages & offers",
+    "description": "streams.schemas.landings_desc"
+  },
+  {
+    "value": "redirect",
+    "name": "Direct URL",
+    "description": "streams.schemas.redirect_desc"
+  },
+  {
+    "value": "action",
+    "name": "Action",
+    "description": "streams.schemas.action_desc"
+  }
+]

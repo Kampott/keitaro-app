@@ -1,0 +1,692 @@
+[
+  {
+    "value": "interval",
+    "tooltip": null,
+    "modes": {
+      "accept": "YES",
+      "reject": "NO"
+    },
+    "group": "filters.groups.time",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "limit",
+    "tooltip": null,
+    "modes": null,
+    "group": "filters.groups.other",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "parameter",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "proxy",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "referrer",
+    "tooltip": "Examples: http://site.com/, *site.com*, /site-(a|b|c)\\.com/, @empty",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "schedule",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.time",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "uniqueness",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": "stream"
+  },
+  {
+    "value": "source",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "x_requested_with",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "keyword",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "search_engine",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "ad_campaign_id",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "creative_id",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_1",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_2",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_3",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_4",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_5",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_6",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_7",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_8",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_9",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_10",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_11",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_12",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_13",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_14",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_15",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_16",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_17",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_18",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_19",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_20",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_21",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_22",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_23",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_24",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_25",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_26",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_27",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_28",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_29",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "sub_id_30",
+    "tooltip": "Regular expressions available. Example: /value (a|b|c)/",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.sub_ids",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "bot",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "city",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "region",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "country",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "connection_type",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "empty_referrer",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.parameters",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "ip",
+    "tooltip": "Examples: 1.2.3.4, 22.33.0-20.*, 22.33.1.0/24, 22.33.44.10-22.33.44.20",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "ipv_6",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "operator",
+    "tooltip": "Start typing to see suggestions or enter a country code",
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "isp",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.geo",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "browser",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "browser_version",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "device_model",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "device_type",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "os",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "os_version",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "user_agent",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "language",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.device",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "test",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.other",
+    "template": "",
+    "defaults": null
+  },
+  {
+    "value": "update_offers_by_report",
+    "tooltip": null,
+    "modes": {
+      "accept": "IS",
+      "reject": "IS NOT"
+    },
+    "group": "filters.groups.other",
+    "template": "<div style=\"font-family: Arial, sans-serif; line-height: 1.5; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;\">\r\n    <div style=\"display: flex; flex-wrap: wrap; gap: 20px;\">\r\n        <div style=\"flex: 1 1 48%; min-width: 300px;\">     \r\n          <div style=\"margin-bottom: 15px;\">\r\n              <label for=\"offer_group_ids\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">ID групп офферов*:</label>\r\n              <input \r\n                  id=\"offer_group_ids\"\r\n                  type=\"text\"\r\n                  ng-model=\"filter.payload.offer_group_ids\"\r\n                  placeholder=\"Например 1422, 1423\"\r\n                  style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; height: 42px;\"\r\n              />\r\n          </div>        \r\n            <div style=\"margin-bottom: 15px;\">\r\n                <label for=\"metric\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">Какую метрику анализировать:</label>\r\n                <select \r\n                    id=\"metric\"\r\n                    ng-model=\"filter.payload.metric\"\r\n                    ng-init=\"filter.payload.metric || (filter.payload.metric='crs')\"\r\n                    style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; height: 42px;\"\r\n                >\r\n                    <option value=\"roi_confirmed\">ROI (подтвержденный)</option>\r\n                    <option value=\"cr\">CR</option>\r\n                    <option value=\"crs\">CRs</option>\r\n                </select>\r\n            </div>\r\n\r\n            <div style=\"margin-bottom: 15px;\">\r\n                <label for=\"statistics\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">Охват статистики:</label>\r\n                <select \r\n                    id=\"statistics\"\r\n                    ng-model=\"filter.payload.statistics\"\r\n                    ng-init=\"filter.payload.statistics || (filter.payload.statistics='creative')\"\r\n                    style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; height: 42px;\"\r\n                >\r\n                    <option value=\"all\">Группы офферов</option>\r\n                    <option value=\"creative\">Группы офферов + креатив</option>\r\n                </select>\r\n            </div>\r\n        </div>\r\n\r\n        <div style=\"flex: 1 1 48%; min-width: 300px;\">\r\n            <div style=\"margin-bottom: 15px;\">\r\n                <label for=\"offer_quantity\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">Кол-во офферов:</label>\r\n                <input \r\n                    type=\"range\" \r\n                    id=\"offer_quantity\"\r\n                    ng-model=\"filter.payload.offer_quantity\"\r\n                    ng-init=\"filter.payload.offer_quantity || (filter.payload.offer_quantity=5)\"\r\n                    min=\"1\" \r\n                    max=\"5\" \r\n                    step=\"1\"\r\n                    style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;\"\r\n                />\r\n                <span>До {{filter.payload.offer_quantity}} офферов</span>\r\n            </div>        \r\n            <div style=\"margin-bottom: 15px;\">\r\n                <label for=\"days\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">Дни статистики:</label>\r\n                <input \r\n                    type=\"range\" \r\n                    id=\"days\"\r\n                    ng-model=\"filter.payload.days\"\r\n                    ng-init=\"filter.payload.days || (filter.payload.days=7)\"\r\n                    min=\"1\" \r\n                    max=\"7\" \r\n                    step=\"1\"\r\n                    style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;\"\r\n                />\r\n                <span>{{filter.payload.days}} дней</span>\r\n            </div>\r\n          <div style=\"margin-bottom: 15px;\"> \r\n                <label \r\n                    style=\"display: block; font-weight: bold; margin-bottom: 5px;\"\r\n                > \r\n                <span>Исключать некоторые источники</span> \r\n                <input \r\n                    type=\"checkbox\" \r\n                    ng-model=\"filter.payload.ignore_ts\" \r\n                    ng-init=\"filter.payload.ignore_ts === undefined ? (filter.payload.ignore_ts=true) : filter.payload.ignore_ts\" \r\n                    style=\"margin-left: 10px;\" \r\n                /> \r\n                </label> \r\n          </div>\r\n\r\n          <div style=\"margin-bottom: 15px;\" ng-show=\"filter.payload.ignore_ts\">\r\n              <label for=\"ignored_ts_ids\" style=\"display: block; font-weight: bold; margin-bottom: 5px;\">ID игнорируемых источников:</label>\r\n              <input \r\n                  id=\"ignored_ts_ids\"\r\n                  type=\"text\"\r\n                  ng-model=\"filter.payload.ignored_ts_ids\"\r\n                  placeholder=\"Например 70, 155\"\r\n                  ng-init=\"filter.payload.ignored_ts_ids || (filter.payload.ignored_ts_ids='70,155,154,189')\"\r\n                  style=\"width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; height: 42px;\"\r\n              />\r\n          </div>\r\n        </div>\r\n    </div>\r\n</div>",
+    "defaults": null
+  }
+]

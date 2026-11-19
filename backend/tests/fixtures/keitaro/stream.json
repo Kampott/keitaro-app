@@ -1,0 +1,33 @@
+{
+  "id": 1329767,
+  "type": "regular",
+  "name": "Flow 1",
+  "campaign_id": 216227,
+  "position": 1,
+  "action_options": null,
+  "comments": "",
+  "state": "active",
+  "created_at": "2026-11-19 22:52:45",
+  "action_type": "http",
+  "action_payload": "REDACTED",
+  "schema": "redirect",
+  "collect_clicks": true,
+  "filter_or": false,
+  "weight": 100,
+  "offer_selection": "before_click",
+  "filters": [
+    {
+      "id": 2994357,
+      "stream_id": 1329767,
+      "name": "country",
+      "mode": "accept",
+      "payload": [
+        "US"
+      ],
+      "oid": 2994357
+    }
+  ],
+  "triggers": [],
+  "landings": [],
+  "offers": []
+}
