@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1c1e21; }
+main { max-width: 860px; margin: 0 auto; padding: 24px; }
+nav button { padding: 8px 16px; border: 1px solid #c5c8cc; background: #fff; cursor: pointer; }
+nav button.active { background: #1c1e21; color: #fff; }
+.card { background: #fff; border: 1px solid #dfe1e5; border-radius: 6px; padding: 16px; margin-top: 16px; }
+.ok { color: #1a7f37; } .err { color: #b42318; } .muted { color: #6b7280; }
