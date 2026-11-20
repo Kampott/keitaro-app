@@ -50,8 +50,8 @@ Nginx проксирует только `/api/` и `/healthz`, остальны�
 |---|---|
 | `catalog_service.py` | домены, группы, источники, офферы; кэш `/offers` на 60 с, только активные офферы, список стран из `core/countries.json` |
 | `keitaro_campaign_service.py` | список кампаний Keitaro для Editor; кэш на 30 с, локальный поиск по name/alias/ID, без `token` в ответе |
-| `share_calculator.py` | чистая функция расчёта целых shares, `MIN_SHARE = 1`, total 100, largest remainder |
-| `campaign_service.py` | Campaign Creator: создание кампании и двух потоков, компенсационная архивация, результат §3.6 |
+| `share_calculator.py` | чистая функция расчёта целых shares, `MIN_SHARE = 1`, сумма 100, метод наибольших остатков |
+| `campaign_service.py` | Campaign Creator: создание кампании и двух потоков, компенсационная архивация, формирование ответа с результатом создания кампании |
 | `sync_service.py` | чтение удалённого состояния, стабильные хэши потока, проверка структуры Creator, запись локальной копии |
 | `editor_service.py` | чтение локальной копии, статусы, Fetch, защита от локальных изменений |
 | `offer_service.py` | Add/Delete/Restore/PATCH офферов, пересчёт shares под блокировкой |
@@ -79,7 +79,7 @@ Nginx проксирует только `/api/` и `/healthz`, остальны�
 
 - `0001_init.py` — пустая база;
 - `0002_editor_tables.py` — четыре таблицы, ограничения и индексы;
-- `0003_flow_remote_payload.py` — колонка `remote_payload JSONB` для fallback full PUT.
+- `0003_flow_remote_payload.py` — колонка `remote_payload JSONB` для резервного полного PUT.
 
 Текущая версия после старта: `0003 (head)`.
 
@@ -121,7 +121,7 @@ Nginx проксирует только `/api/` и `/healthz`, остальны�
 3. Блокировки campaign и потоков в стабильном порядке `ORDER BY id ... FOR UPDATE`, повторная проверка статусов и revision.
 4. Атомарная замена полей кампании, потоков и офферов; `sync_status=synced`, `revision=0`.
 5. Офферы со `state != active` попадают в `deleted_offers`. Потоки, исчезнувшие в Keitaro, получают `state=deleted` и скрываются из UI, но данные сохраняются.
-6. successful Fetch пишет `SyncLog`, ошибка записи — `LOCAL_DB_ERROR` (500) с откатом транзакции.
+6. Успешный Fetch пишет `SyncLog`, ошибка записи — `LOCAL_DB_ERROR` (500) с откатом транзакции.
 
 ## Локальные мутации офферов
 

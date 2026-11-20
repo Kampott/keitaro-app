@@ -7,7 +7,7 @@
 - Базовый путь: `/admin_api/v1`; заголовок запроса: `Api-Key: <ключ из .env>`
 - Всего в спецификации: 87 путей, 69 схем. Спецификация проверена на секреты: только плейсхолдер `your-api-key`.
 
-Этот файл — рабочая выжимка для Campaign Creator (§3.5 ТЗ). Полный автомат write-путей в конце.
+Этот файл — выжимка по write-эндпоинтам, используемым при создании кампании. Полный автомат write-путей в конце.
 
 ## Эндпоинты, используемые приложением
 
@@ -21,7 +21,7 @@
 | `alias` | string | 8 символов `[a-z0-9]`, генерирует backend |
 | `type` | string, enum `position`/`weight`, default `position` | `position` |
 | `domain_id` | integer | выбранный домен |
-| `group_id` | **string** (в ответе `Campaign` — integer) | число по ТЗ §3.4; при отклонении — повтор строкой |
+| `group_id` | **string** (в ответе `Campaign` — integer) | число; при отклонении — повтор строкой |
 | `traffic_source_id` | integer | выбранный источник |
 | `cost_type` | string, enum `CPC`/`CPUC`/`CPM` | `CPC` |
 | `cost_value` | number | `0` |
@@ -57,7 +57,7 @@ server-side search в спецификации отсутствует; дост�
 
 Структура `StreamObject`: `campaign_id` (int), `type` (`forced`/`regular`/`default`), `name`, `position` (int), `weight` (int), `action_options` (object), `comments`, `state` (`active`/`disabled`/`deleted`, default `active`), `action_type`, `schema` (`landings`/`redirect`/`action`), `collect_clicks`, `filter_or`, `filters`, `triggers`, `landings`, `offers`.
 
-**Важно:** поля `action_payload` в схеме создания нет. Значит URL редиректа передаётся как `action_options: {"url": ...}` (совпадает с гипотезой ТЗ; расхождение с эталонной кампанией 216227, где после создания в UI URL попал в `action_payload`).
+**Важно:** поля `action_payload` в схеме создания нет. Значит URL редиректа передаётся как `action_options: {"url": ...}` (совпадает с принятым решением; расхождение с эталонной кампанией 216227, где после создания в UI URL попал в `action_payload`).
 
 Вложенные схемы:
 - `FilterStreamRequest`: `name` (required), `mode` (`accept`/`reject`, required), `payload` (array of string), опционально `id` при обновлении;
@@ -95,4 +95,4 @@ python -c "import json; d=json.load(open('docs/keitaro_openapi.json',encoding='u
 Отдельный скрипт сверки после завершения удалён из проекта.
 - `group_id`: в запросе string, в ответе integer — отправляем число, при отклонении повторяем строкой.
 
-Эти пункты в коде закрыты консервативными вариантами, описанными в ТЗ §2.3 и §3.5.
+Эти пункты реализованы консервативно: контрольное чтение после partial PUT, очистка `name`/`alias` перед архивацией, обработка офферов в состоянии `disabled`.
