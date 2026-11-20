@@ -124,10 +124,7 @@ def add_offer(
     """
     _flow_or_404(session, campaign_id, flow_id)
 
-    try:
-        found = catalog.get_offer(offer_id)  # сетевой вызов до захвата блокировки
-    except AppError:
-        found = None
+    found = catalog.get_offer(offer_id)  # сетевой вызов до захвата блокировки
     name = found.name if found is not None else str(offer_id)
 
     try:
