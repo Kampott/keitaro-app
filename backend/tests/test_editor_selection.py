@@ -76,6 +76,23 @@ def test_remote_campaigns_search_and_sanitize(client):
     assert "token" not in r_all.json()[0]
 
 
+def test_remote_campaigns_limit_covers_full_tracker(client):
+    """В трекере 205 кампаний: лимит 1000 должен вернуть их все, 200 — обрезал бы."""
+    rows = [
+        {**CAMPAIGN, "id": i, "name": f"Campaign {i}", "alias": f"c{i:07d}"}
+        for i in range(1, 206)
+    ]
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        m.get("campaigns").respond(200, json=rows)
+        r = client.get("/api/keitaro/campaigns?limit=1000", auth=AUTH)
+        rejected = client.get("/api/keitaro/campaigns?limit=1001", auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    assert len(r.json()) == 205
+    assert r.json()[-1]["id"] == 205
+    assert rejected.status_code == 422
+
+
 def test_first_fetch_creates_local_copy(client, session):
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         install_fetch_routes(m)

@@ -205,18 +205,22 @@ def test_missing_campaign_rejected(client, session):
     assert r.status_code == 409 and r.json()["code"] == "CAMPAIGN_ARCHIVED"
 
 
-def test_empty_flow_rejected(client, session):
-    c, f = make_campaign(session, offers=[
-        dict(koi=18813, share=0, state="active", active=False),
-    ])
+def test_empty_flow_upload_is_allowed(client, session):
+    """Пустой список офферов отправляется в Keitaro как offers: []."""
+    c, f = make_campaign(session, offers=[])
     remote = Remote()
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         remote.install(m)
         r = client.post(f"/api/flows/{f.id}/upload", json={}, auth=AUTH)
 
-    assert r.status_code == 422 and r.json()["code"] == "EMPTY_FLOW"
-    assert remote.puts == []
+    assert r.status_code == 200, r.text
+    assert remote.puts == [{"offers": []}]
+    flow = flow_of(r.json())
+    assert flow["offers"] == [] and flow["shares_valid"] is False
+    assert flow["sync_status"] == "synced"
     assert session.get(models.CampaignFlow, f.id).sync_status == "synced"
+    logs = session.query(models.SyncLog).filter_by(flow_id=f.id, operation="upload").all()
+    assert len(logs) == 1 and logs[0].status == "success"
 
 
 def test_invalid_shares_rejected(client, session):

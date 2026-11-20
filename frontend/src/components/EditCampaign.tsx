@@ -99,7 +99,7 @@ export default function EditCampaign({ notify }: Props) {
     (async () => {
       setCampaignLoading(true);
       try {
-        const rows = await api<KeitaroCampaign[]>(`/api/keitaro/campaigns${query({ limit: 200 })}`);
+        const rows = await api<KeitaroCampaign[]>(`/api/keitaro/campaigns${query({ limit: 1000 })}`);
         if (!cancelled) setRemoteCampaigns(rows);
       } catch (error) {
         if (!cancelled) notify("error", `Кампании Keitaro недоступны: ${describeError(error)}`);

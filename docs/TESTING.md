@@ -1,6 +1,6 @@
 # Тестирование
 
-Backend-набор: **147 passed**. Тесты используют отдельную PostgreSQL-БД, Keitaro полностью мокируется, живые WRITE-вызовы не выполняются. Frontend проверяется сборкой TypeScript/Vite и вручную в браузере.
+Backend-набор: **148 passed**. Тесты используют отдельную PostgreSQL-БД, Keitaro полностью мокируется, живые WRITE-вызовы не выполняются. Frontend проверяется сборкой TypeScript/Vite и вручную в браузере.
 
 ## Запуск backend-тестов
 
@@ -13,7 +13,7 @@ docker compose run --rm --build backend python -m pytest -q
 Ожидаемый итог:
 
 ```text
-147 passed, 1 warning in 2.11s
+148 passed, 1 warning in 2.78s
 ```
 
 Warning — `StarletteDeprecationWarning` от связки FastAPI TestClient/httpx; на результат не влияет.
@@ -55,9 +55,9 @@ SQLite не используется. Тесты работают только �
 | `test_campaign_creator.py` | 17 | POST-тела для одного и нескольких офферов, GEO, дубли, таймаут и поиск по alias, компенсационная архивация, отказ архивировать при сетевой ошибке БД, tracking URL |
 | `test_editor_fetch.py` | 9 | чтение и статусы, force/BUSY, ошибки Keitaro, контроль revision, архивные офферы и потоки |
 | `test_editor_offers.py` | 22 | Add/Delete/Restore/Fixed/PATCH, выравнивание shares после удаления, произвольные Offer ID, `name_unavailable`, мутации «read-only» потоков, ошибки Fixed и блокировки |
-| `test_editor_selection.py` | 4 | список кампаний Keitaro, локальный поиск, первый Fetch, кэш 30 с |
-| `test_editor_upload.py` | 14 | partial/full PUT, `REMOTE_CHANGED` и force, `CAMPAIGN_ARCHIVED`, `BUSY`, `EMPTY_FLOW`, `INVALID_SHARES`, контрольное чтение, error-log, recovery зависших `uploading` |
-| **Итого** | **147** | — |
+| `test_editor_selection.py` | 5 | список кампаний Keitaro, лимит 1000 на 205 кампаний, локальный поиск, первый Fetch, кэш 30 с |
+| `test_editor_upload.py` | 14 | partial/full PUT, `REMOTE_CHANGED` и force, `CAMPAIGN_ARCHIVED`, `BUSY`, пустой список офферов, `INVALID_SHARES`, контрольное чтение, error-log, recovery зависших `uploading` |
+| **Итого** | **148** | — |
 
 ## Shares и `MIN_SHARE`
 

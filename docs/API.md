@@ -193,11 +193,11 @@ curl -u "$APP_BASIC_AUTH_USER:$APP_BASIC_AUTH_PASSWORD" \
 | Параметр | По умолчанию | Ограничение |
 |---|---|---|
 | `search` | `""` | подстрока name/alias/ID, регистронезависимо |
-| `limit` | `50` | `1..200` |
+| `limit` | `50` | `1..1000` |
 | `offset` | `0` | `>= 0` |
 | `refresh` | `false` | `true` сбрасывает кэш перед чтением |
 
-Ответ: `KeitaroCampaignItem[]`. Кампании в состоянии `deleted` исключены.
+Ответ: `KeitaroCampaignItem[]`. Кампании в состоянии `deleted` исключены. Лимит `1000` соответствует контракту: проверенный трекер возвращает 205 кампаний, backend загружает их все за один запрос, frontend запрашивает `1000`.
 
 #### `GET /api/keitaro/defaults`
 
@@ -345,8 +345,9 @@ curl -u "$APP_BASIC_AUTH_USER:$APP_BASIC_AUTH_PASSWORD" \
 1. кампания существует в Keitaro и активна (`CAMPAIGN_ARCHIVED`, `KEITARO_NOT_FOUND`);
 2. поток не изменился удалённо (`REMOTE_CHANGED`, обходится `force=true`);
 3. поток не отправляется сейчас (`BUSY`);
-4. есть хотя бы один активный оффер (`EMPTY_FLOW`);
-5. shares корректны (`INVALID_SHARES`).
+4. shares корректны (`INVALID_SHARES`).
+
+Пустой список активных офферов допустим: в Keitaro отправляется `{"offers": []}`. Код `EMPTY_FLOW` больше не используется.
 
 Затем выполняется partial `PUT /streams/{id}` только с `offers`, контрольное чтение, при необходимости полный `PUT` с сохранённым `remote_payload`, и ещё одно контрольное чтение. При успехе обновляются `remote_hash`, `remote_payload`, `last_uploaded_at`, `sync_status` и `SyncLog`.
 
@@ -375,11 +376,10 @@ curl -u "$APP_BASIC_AUTH_USER:$APP_BASIC_AUTH_PASSWORD" \
 | `LOCAL_CHANGES` | 409 | есть локальные правки, а `force=false` |
 | `REMOTE_CHANGED` | 409 | поток изменился в Keitaro после последнего Fetch/Upload |
 | `CAMPAIGN_ARCHIVED` | 409 | кампания в Keitaro архивирована или не найдена |
-| `EMPTY_FLOW` | 422 | в потоке нет активных офферов |
 | `CAMPAIGN_CREATE_FAILED` | 502 | не удалось создать поток/структуру; кампания архивирована компенсационно |
 | `KEITARO_LIST_INCOMPLETE` | 502 | не удалось подтвердить полноту списка кампаний при поиске по alias |
 | `CREATE_UNKNOWN_RESULT` | 502 | после обрыва ответа кампания не найдена; повторный POST не выполнялся |
 | `AMBIGUOUS_ALIAS` | 502 | найдено несколько кампаний с одним alias |
 | `LOCAL_DB_ERROR` | 500 | ошибка записи локальной копии при Fetch |
 
-`FLOW_READONLY` больше не используется: демо-переключатель и блокировка удалены.
+`FLOW_READONLY` больше не используется: демо-переключатель и блокировка удалены. `EMPTY_FLOW` больше не возвращается: пустой список офферов разрешён.

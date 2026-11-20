@@ -25,7 +25,7 @@ def ping(keitaro: KeitaroClient = Depends(get_keitaro)):
 @router.get("/campaigns", response_model=list[KeitaroCampaignItem])
 def remote_campaigns(
     search: str = "",
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     refresh: bool = False,
     client: KeitaroClient = Depends(get_keitaro),

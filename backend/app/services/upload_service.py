@@ -144,9 +144,8 @@ def upload_flow(
         if locked.sync_status == "uploading":
             raise AppError("BUSY", "Поток уже отправляется", 409, details={"flow_id": flow_id})
         rows = _active_offers(session, flow_id)
-        if not rows:
-            raise AppError("EMPTY_FLOW", "В потоке нет активных офферов", 422)
-        if not shares_valid([r.share for r in rows]):
+        # Пустой список допустим: Keitaro принимает offers: [] (подтверждено владельцем).
+        if rows and not shares_valid([r.share for r in rows]):
             raise AppError("INVALID_SHARES", "Некорректные shares активных офферов", 422)
         snapshot = _offer_snapshot(rows)
         r0 = locked.revision
