@@ -54,7 +54,37 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .share-input { width: 80px; text-align: right; }
 .inline { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .inline input, .inline select { flex: 1; min-width: 0; }
+.inline button { flex: 0 0 auto; white-space: nowrap; }
 .check-line { display: flex; align-items: center; font-size: 13px; padding: 3px 0; cursor: pointer; }
+
+.picker { position: relative; min-width: 0; }
+.picker-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #c8ccd2;
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.picker-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.picker-option:hover, .picker-option.active { background: #eaf2ff; }
+.picker-option.selected { color: #1f6feb; font-weight: 600; }
+.picker-option small { color: #6b7280; font-size: 11px; }
+.picker-empty { padding: 7px 9px; font-size: 13px; color: #6b7280; }
 
 .geo-list {
   max-height: 170px;
@@ -67,11 +97,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip { padding: 3px 8px; font-size: 12px; background: #eaf2ff; border-color: #b8d3ff; color: #1f6feb; }
-.suggestions { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 180px; overflow: auto; }
-.suggestions button { text-align: left; font-size: 13px; padding: 5px 8px; }
-.inline-suggestions { flex-direction: row; flex-wrap: wrap; margin-top: 0; max-height: 90px; }
-.inline-suggestions button { font-size: 12px; }
-.selected { padding: 8px; background: #eaf2ff; border-radius: 5px; font-size: 13px; }
+.offer-hint { margin: 5px 0 0; }
 
 .ok { color: #1a7f37; }
 .err { color: #b42318; }
@@ -87,9 +113,10 @@ th, td { text-align: left; border-bottom: 1px solid #e8eaed; padding: 7px 8px; v
 th { color: #57606a; font-weight: 600; background: #f8f9fa; }
 .table-wrap { overflow-x: auto; }
 .table-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.offer-add { flex: 0 0 360px; }
-.offer-add .inline { flex-wrap: wrap; }
-.offer-add .inline button { white-space: nowrap; }
+.offer-add { flex: 0 0 360px; min-width: 0; }
+.share-edit { display: flex; gap: 6px; align-items: center; }
+.share-edit button { padding: 4px 8px; font-size: 12px; }
+.share-input.dirty { border-color: #1f6feb; }
 
 .campaign-head { margin-top: 16px; padding-top: 12px; border-top: 1px solid #e8eaed; }
 .campaign-head h3 { margin-top: 0; }
@@ -100,7 +127,7 @@ th { color: #57606a; font-weight: 600; background: #f8f9fa; }
 .flow-tab:disabled { opacity: .45; background: #f1f3f5; color: #8c959f; cursor: not-allowed; }
 .flow-tab small { color: #6b7280; font-size: 11px; }
 .flow-toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-.toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .badge {
   display: inline-block;
@@ -117,14 +144,17 @@ th { color: #57606a; font-weight: 600; background: #f8f9fa; }
 
 .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
 .toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   max-width: 420px;
   padding: 11px 14px;
   border-radius: 6px;
   color: #fff;
-  cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   font-size: 13px;
 }
+.toast button { padding: 0 3px; border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; }
 .toast.success { background: #1a7f37; }
 .toast.error { background: #b42318; }
 .toast.info { background: #1f6feb; }
@@ -143,5 +173,5 @@ th { color: #57606a; font-weight: 600; background: #f8f9fa; }
 @media (max-width: 900px) {
   .grid-two { grid-template-columns: 1fr; }
   .flow-toolbar, .table-head { flex-direction: column; }
-  .table-head .inline { flex: 1 1 auto; width: 100%; }
+  .offer-add { flex: 1 1 auto; width: 100%; }
 }

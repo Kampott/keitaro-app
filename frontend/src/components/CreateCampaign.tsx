@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { api, ApiError, describeError, query } from "../api";
 import type {
   CampaignCreateResult, Country, Defaults, DomainItem, Notify,
@@ -17,7 +17,11 @@ export default function CreateCampaign({ notify }: Props) {
   const [geoSearch, setGeoSearch] = useState("");
   const [offerSearch, setOfferSearch] = useState("");
   const [offers, setOffers] = useState<OfferItem[]>([]);
+  const [offersReloadNonce, setOffersReloadNonce] = useState(0);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [offersOpen, setOffersOpen] = useState(false);
+  const [offerActive, setOfferActive] = useState(-1);
+  const offerPickerRef = useRef<HTMLDivElement>(null);
   const [selectedOffers, setSelectedOffers] = useState<OfferItem[]>([]);
   const [newGroup, setNewGroup] = useState("");
   const [form, setForm] = useState({
@@ -62,8 +66,7 @@ export default function CreateCampaign({ notify }: Props) {
     };
   }, [notify]);
 
-  // Список офферов показываем сразу при фокусе/пустом поиске: так autocomplete
-  // действительно всплывает, а не требует двух символов. Backend кэширует ответ.
+  // Список офферов показываем сразу при фокусе/пустом поиске: backend кэширует ответ.
   useEffect(() => {
     const term = offerSearch.trim();
     let cancelled = false;
@@ -89,19 +92,28 @@ export default function CreateCampaign({ notify }: Props) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [offerSearch, notify]);
+  }, [offerSearch, offersReloadNonce, notify]);
+
+  useEffect(() => {
+    function closeOnOutside(event: MouseEvent) {
+      if (offerPickerRef.current && !offerPickerRef.current.contains(event.target as Node)) setOffersOpen(false);
+    }
+    document.addEventListener("mousedown", closeOnOutside);
+    return () => document.removeEventListener("mousedown", closeOnOutside);
+  }, []);
 
   const geoQuery = geoSearch.trim().toLowerCase();
   const filteredCountries = countries.filter((country) =>
     !geoQuery || country.code.toLowerCase().includes(geoQuery) || country.name.toLowerCase().includes(geoQuery));
-  // Не рендерим все 249 чекбоксов: сначала выбранные, затем первые 12 страны.
-  // Поиск показывает до 20 совпадений — нужную страну всегда можно найти.
-  const visibleCountries = geoQuery
-    ? filteredCountries.slice(0, 20)
-    : [
-        ...filteredCountries.filter((country) => form.geo.includes(country.code)),
-        ...filteredCountries.filter((country) => !form.geo.includes(country.code)).slice(0, 12),
-      ];
+  // Порядок списка стабилен: выбранные страны остаются в нём на своих местах,
+  // а их полный перечень показан в чипсах под полем поиска.
+  const visibleCountries = filteredCountries.slice(0, 12);
+
+  const selectedOfferIds = new Set(form.offerIds);
+  const availableOffers = offers.filter((offer) => !selectedOfferIds.has(offer.id));
+  const offerLimitReached = form.offerIds.length >= MAX_CREATE_OFFERS;
+  const visibleOffers = offerLimitReached ? [] : availableOffers;
+  const formDisabled = busy !== null;
 
   function toggleGeo(code: string) {
     setForm((current) => ({
@@ -113,6 +125,7 @@ export default function CreateCampaign({ notify }: Props) {
   }
 
   function addSelectedOffer(offer: OfferItem) {
+    if (offerLimitReached || selectedOfferIds.has(offer.id)) return;
     setSelectedOffers((current) =>
       current.some((item) => item.id === offer.id) ? current : [...current, offer],
     );
@@ -121,7 +134,9 @@ export default function CreateCampaign({ notify }: Props) {
       offerIds: current.offerIds.includes(offer.id) ? current.offerIds : [...current.offerIds, offer.id],
     }));
     setOfferSearch("");
-    setOffers([]);
+    setOffersOpen(false);
+    setOfferActive(-1);
+    setOffersReloadNonce((value) => value + 1);
   }
 
   function removeSelectedOffer(offerId: number) {
@@ -130,6 +145,28 @@ export default function CreateCampaign({ notify }: Props) {
       ...current,
       offerIds: current.offerIds.filter((id) => id !== offerId),
     }));
+  }
+
+  function offerKeys(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setOffersOpen(false);
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!visibleOffers.length) return;
+      event.preventDefault();
+      setOffersOpen(true);
+      setOfferActive((current) => event.key === "ArrowDown"
+        ? Math.min(current + 1, visibleOffers.length - 1)
+        : Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = visibleOffers[offerActive]
+        ?? (visibleOffers.length === 1 ? visibleOffers[0] : undefined);
+      if (selected) addSelectedOffer(selected);
+    }
   }
 
   async function createGroup() {
@@ -156,7 +193,7 @@ export default function CreateCampaign({ notify }: Props) {
     event.preventDefault();
     if (busy) return; // защита от двойного клика
     if (!form.name.trim() || !form.geo.length || !form.offerIds.length || !form.domainId || !form.groupId || !form.sourceId) {
-      notify("error", "Заполните Name, GEO, хотя бы один Offer, Domain, Group и Source");
+      notify("error", "Заполните поля Name, GEO, Offers, Domain, Group и Source.");
       return;
     }
     setBusy("create");
@@ -194,6 +231,7 @@ export default function CreateCampaign({ notify }: Props) {
             <input
               value={form.name}
               maxLength={255}
+              disabled={formDisabled}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
               placeholder="Название кампании"
             />
@@ -202,16 +240,36 @@ export default function CreateCampaign({ notify }: Props) {
           <div className="field">
             <span>GEO * (поиск по коду или названию)</span>
             <input
+              aria-label="Поиск GEO по коду или названию"
               value={geoSearch}
+              disabled={formDisabled}
               onChange={(event) => setGeoSearch(event.target.value)}
               placeholder="Например: AU или Australia"
             />
+            {!!form.geo.length && (
+              <div className="chips">
+                {form.geo.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    className="chip"
+                    disabled={formDisabled}
+                    title={`Убрать ${code}`}
+                    aria-label={`Убрать GEO ${code}`}
+                    onClick={() => toggleGeo(code)}
+                  >
+                    {code} ×
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="geo-list">
               {visibleCountries.map((country) => (
                 <label key={country.code} className="check-line">
                   <input
                     type="checkbox"
                     checked={form.geo.includes(country.code)}
+                    disabled={formDisabled}
                     onChange={() => toggleGeo(country.code)}
                   />
                   {country.code} — {country.name}
@@ -221,19 +279,56 @@ export default function CreateCampaign({ notify }: Props) {
             </div>
             <p className="muted geo-hint">
               Показано {visibleCountries.length} из {filteredCountries.length}.
-              {!geoQuery && " Уточните поиск, чтобы выбрать другую страну."}
+              {visibleCountries.length < filteredCountries.length && " Уточните поиск, чтобы увидеть остальные страны."}
             </p>
-            <div className="chips">
-              {form.geo.map((code) => (
-                <button key={code} type="button" className="chip" onClick={() => toggleGeo(code)}>
-                  {code} ×
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="field">
             <span>Offers * (можно выбрать несколько, до {MAX_CREATE_OFFERS})</span>
+            <div className="picker" ref={offerPickerRef}>
+              <input
+                role="combobox"
+                aria-label="Поиск оффера для добавления"
+                aria-expanded={offersOpen}
+                aria-controls="create-offer-options"
+                aria-autocomplete="list"
+                aria-activedescendant={offersOpen && offerActive >= 0 ? `create-offer-option-${offerActive}` : undefined}
+                value={offerSearch}
+                disabled={formDisabled || offerLimitReached}
+                onChange={(event) => {
+                  setOfferSearch(event.target.value);
+                  setOfferActive(-1);
+                  setOffersOpen(true);
+                }}
+                onFocus={() => { if (!offerLimitReached) { setOffersOpen(true); setOfferActive(-1); } }}
+                onKeyDown={offerKeys}
+                placeholder="Название или ID оффера"
+              />
+              {offersOpen && !offerLimitReached && (
+                <div className="picker-menu" id="create-offer-options" role="listbox">
+                  {offersLoading && !offers.length && <div className="picker-empty">Загрузка каталога…</div>}
+                  {visibleOffers.map((offer, index) => (
+                    <div
+                      key={offer.id}
+                      id={`create-offer-option-${index}`}
+                      role="option"
+                      aria-selected={index === offerActive}
+                      tabIndex={-1}
+                      className={`picker-option ${index === offerActive ? "active" : ""}`}
+                      onMouseEnter={() => setOfferActive(index)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => addSelectedOffer(offer)}
+                    >
+                      <span>#{offer.id} — {offer.name}</span>
+                    </div>
+                  ))}
+                  {!offersLoading && !offers.length && <div className="picker-empty">Ничего не найдено</div>}
+                  {!offersLoading && offers.length > 0 && !visibleOffers.length && (
+                    <div className="picker-empty">Все найденные офферы уже выбраны</div>
+                  )}
+                </div>
+              )}
+            </div>
             {!!selectedOffers.length && (
               <div className="chips">
                 {selectedOffers.map((offer) => (
@@ -241,41 +336,28 @@ export default function CreateCampaign({ notify }: Props) {
                     key={offer.id}
                     type="button"
                     className="chip"
-                    onClick={() => removeSelectedOffer(offer.id)}
+                    disabled={formDisabled}
                     title="Убрать оффер"
+                    aria-label={`Убрать оффер ${offer.id}`}
+                    onClick={() => removeSelectedOffer(offer.id)}
                   >
                     #{offer.id} — {offer.name} ×
                   </button>
                 ))}
               </div>
             )}
-            <input
-              value={offerSearch}
-              onChange={(event) => setOfferSearch(event.target.value)}
-              placeholder="Название или ID оффера; список появится сразу"
-            />
-            <div className="suggestions">
-              {offersLoading && <span className="muted">Загрузка каталога…</span>}
-              {!offersLoading && offers.map((offer) => (
-                <button
-                  key={offer.id}
-                  type="button"
-                  disabled={selectedOffers.length >= MAX_CREATE_OFFERS}
-                  onClick={() => addSelectedOffer(offer)}
-                >
-                  + #{offer.id} — {offer.name}
-                </button>
-              ))}
-              {!offersLoading && !offers.length && <span className="muted">Ничего не найдено</span>}
-              {selectedOffers.length >= MAX_CREATE_OFFERS && (
-                <span className="muted">Достигнут лимит в {MAX_CREATE_OFFERS} офферов</span>
-              )}
-            </div>
+            {offerLimitReached && (
+              <p className="muted offer-hint">Достигнут лимит в {MAX_CREATE_OFFERS} офферов.</p>
+            )}
           </div>
 
           <label className="field">
             <span>Domain *</span>
-            <select value={form.domainId || ""} onChange={(event) => setForm({ ...form, domainId: Number(event.target.value) })}>
+            <select
+              value={form.domainId || ""}
+              disabled={formDisabled}
+              onChange={(event) => setForm({ ...form, domainId: Number(event.target.value) })}
+            >
               <option value="">— выберите —</option>
               {domains.map((item) => <option key={item.id} value={item.id}>{item.name} (#{item.id})</option>)}
             </select>
@@ -283,17 +365,22 @@ export default function CreateCampaign({ notify }: Props) {
 
           <div className="field">
             <span>Group *</span>
-            <select value={form.groupId || ""} onChange={(event) => setForm({ ...form, groupId: Number(event.target.value) })}>
+            <select
+              value={form.groupId || ""}
+              disabled={formDisabled}
+              onChange={(event) => setForm({ ...form, groupId: Number(event.target.value) })}
+            >
               <option value="">— выберите —</option>
               {groups.map((item) => <option key={item.id} value={item.id}>{item.name} (#{item.id})</option>)}
             </select>
             <div className="inline">
               <input
                 value={newGroup}
+                disabled={formDisabled}
                 onChange={(event) => setNewGroup(event.target.value)}
                 placeholder="Новая группа"
               />
-              <button type="button" disabled={busy !== null || !newGroup.trim()} onClick={createGroup}>
+              <button type="button" disabled={formDisabled || !newGroup.trim()} onClick={createGroup}>
                 {busy === "group" ? "Создание…" : "Создать группу"}
               </button>
             </div>
@@ -301,13 +388,17 @@ export default function CreateCampaign({ notify }: Props) {
 
           <label className="field">
             <span>Source *</span>
-            <select value={form.sourceId || ""} onChange={(event) => setForm({ ...form, sourceId: Number(event.target.value) })}>
+            <select
+              value={form.sourceId || ""}
+              disabled={formDisabled}
+              onChange={(event) => setForm({ ...form, sourceId: Number(event.target.value) })}
+            >
               <option value="">— выберите —</option>
               {sources.map((item) => <option key={item.id} value={item.id}>{item.name} (#{item.id})</option>)}
             </select>
           </label>
 
-          <button type="submit" className="primary" disabled={busy !== null}>
+          <button type="submit" className="primary" disabled={formDisabled}>
             {busy === "create" ? "Создание…" : "Create Campaign"}
           </button>
         </form>

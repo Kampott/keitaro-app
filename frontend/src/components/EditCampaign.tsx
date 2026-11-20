@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, describeError, query } from "../api";
 import type {
-  CampaignDetail, CampaignSummary, FlowDetail, KeitaroCampaign, Notify, OfferDetail, OfferItem,
+  CampaignDetail, CampaignSummary, KeitaroCampaign, Notify, OfferDetail, OfferItem,
 } from "../types";
 
 type Props = { notify: Notify };
+type OfferOption = { id: number; label: string; hint?: string };
 
 const STATUS_TEXT: Record<string, string> = {
   synced: "Синхронизировано",
@@ -13,19 +14,36 @@ const STATUS_TEXT: Record<string, string> = {
   error: "Ошибка",
 };
 
+const BUSY_TEXT: Record<string, string> = {
+  select: "Загрузка кампании",
+  fetch: "Обновление из Keitaro",
+  offer: "Сохранение оффера",
+  upload: "Отправка в Keitaro",
+};
+
+function campaignOptionLabel(item: KeitaroCampaign): string {
+  return `#${item.id} ${item.name} (${item.alias})${item.state ? ` · ${item.state}` : ""}`;
+}
+
 export default function EditCampaign({ notify }: Props) {
   const [remoteCampaigns, setRemoteCampaigns] = useState<KeitaroCampaign[]>([]);
   const [campaignLoading, setCampaignLoading] = useState(true);
   const [localCampaigns, setLocalCampaigns] = useState<CampaignSummary[]>([]);
-  const [campaignSearch, setCampaignSearch] = useState("");
+  const [campaignQuery, setCampaignQuery] = useState("");
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [campaignActive, setCampaignActive] = useState(-1);
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [flowId, setFlowId] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const campaignPickerRef = useRef<HTMLDivElement>(null);
   const [offerSearch, setOfferSearch] = useState("");
   const [offerResults, setOfferResults] = useState<OfferItem[]>([]);
+  const [offerReloadNonce, setOfferReloadNonce] = useState(0);
   const [offersLoading, setOffersLoading] = useState(false);
-  const [customOfferId, setCustomOfferId] = useState("");
+  const [offersOpen, setOffersOpen] = useState(false);
+  const [offerActive, setOfferActive] = useState(-1);
+  const offerPickerRef = useRef<HTMLDivElement>(null);
   const [draftShares, setDraftShares] = useState<Record<number, string>>({});
   const [forceUpload, setForceUpload] = useState(false);
 
@@ -70,21 +88,31 @@ export default function EditCampaign({ notify }: Props) {
     return () => { cancelled = true; };
   }, [notify]);
 
+  useEffect(() => {
+    function closeOnOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (campaignPickerRef.current && !campaignPickerRef.current.contains(target)) setCampaignOpen(false);
+      if (offerPickerRef.current && !offerPickerRef.current.contains(target)) setOffersOpen(false);
+    }
+    document.addEventListener("mousedown", closeOnOutside);
+    return () => document.removeEventListener("mousedown", closeOnOutside);
+  }, []);
+
   const flows = campaign?.flows ?? [];
   const landingFlows = flows.filter((item) => item.schema === "landings");
   const flow = landingFlows.find((item) => item.id === flowId) ?? landingFlows[0] ?? null;
-  const searchText = campaignSearch.trim().toLowerCase();
+  const campaignText = campaignQuery.trim().toLowerCase();
   const visibleCampaigns = remoteCampaigns.filter((item) =>
-    !searchText
-    || item.name.toLowerCase().includes(searchText)
-    || item.alias.toLowerCase().includes(searchText)
-    || String(item.id).includes(searchText));
+    !campaignText
+    || item.name.toLowerCase().includes(campaignText)
+    || item.alias.toLowerCase().includes(campaignText)
+    || String(item.id).includes(campaignText));
 
-  //Autocomplete показывает каталог сразу (в том числе на пустом поиске),
-  //поэтому список появляется при фокусе, а не только после двух символов.
+  // Подсказки показываются сразу при фокусе, в том числе на пустом поиске.
   useEffect(() => {
     if (!flow) {
       setOfferResults([]);
+      setOffersLoading(false);
       return;
     }
     const term = offerSearch.trim();
@@ -111,9 +139,26 @@ export default function EditCampaign({ notify }: Props) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [offerSearch, flow?.id, notify]);
+  }, [offerSearch, offerReloadNonce, flow?.id, notify]);
 
-  function applyDetail(detail: CampaignDetail) {
+  const selectedOfferIds = new Set(flow?.offers.map((item) => item.keitaro_offer_id) ?? []);
+  const availableOffers = offerResults.filter((item) => !selectedOfferIds.has(item.id));
+  const rawCustomId = offerSearch.trim();
+  const customOfferId = /^\d+$/.test(rawCustomId) && Number(rawCustomId) > 0 ? Number(rawCustomId) : null;
+  const customAlreadyAdded = customOfferId !== null && selectedOfferIds.has(customOfferId);
+  const customInCatalog = customOfferId !== null && availableOffers.some((item) => item.id === customOfferId);
+  const offerOptions: OfferOption[] = [
+    ...availableOffers.map((offer) => ({
+      id: offer.id,
+      label: `#${offer.id} — ${offer.name}`,
+      hint: "из каталога",
+    })),
+    ...(customOfferId !== null && !customAlreadyAdded && !customInCatalog
+      ? [{ id: customOfferId, label: `Добавить оффер #${customOfferId}`, hint: "по ID, название может быть недоступно" }]
+      : []),
+  ];
+
+  function applyDetail(detail: CampaignDetail, resetDrafts = false) {
     setCampaign(detail);
     // Остаёмся на том же редактируемом потоке, если он ещё есть;
     // потоки со схемой не landings не выбираются.
@@ -123,7 +168,7 @@ export default function EditCampaign({ notify }: Props) {
         ? current
         : landings[0]?.id ?? null,
     );
-    setDraftShares({});
+    if (resetDrafts) setDraftShares({});
   }
 
   async function fetchKeitaro(keitaroId: number, force = false): Promise<CampaignDetail> {
@@ -149,7 +194,10 @@ export default function EditCampaign({ notify }: Props) {
       const detail = local
         ? await api<CampaignDetail>(`/api/campaigns/${local.id}`)
         : await fetchKeitaro(selected.id);
-      applyDetail(detail);
+      applyDetail(detail, true);
+      setCampaignQuery(campaignOptionLabel(selected));
+      setCampaignOpen(false);
+      setCampaignActive(-1);
       if (!local) notify("success", `Локальная копия кампании ${selected.id} создана через Fetch`);
       await refreshLocal();
     } catch (error) {
@@ -163,7 +211,7 @@ export default function EditCampaign({ notify }: Props) {
     if (!campaign || !begin("fetch")) return;
     try {
       const detail = await fetchKeitaro(campaign.keitaro_id);
-      applyDetail(detail);
+      applyDetail(detail, true);
       notify("success", "Fetch из Keitaro выполнен");
       await refreshLocal();
     } catch (error) {
@@ -201,12 +249,19 @@ export default function EditCampaign({ notify }: Props) {
       setDraftShares((current) => ({ ...current, [offer.keitaro_offer_id]: String(offer.share) }));
       return;
     }
-    await mutate(
+    const ok = await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers/${offer.keitaro_offer_id}`,
       "PATCH",
       { share: Number(raw) },
       `Share оффера ${offer.keitaro_offer_id} обновлён`,
     );
+    if (ok) {
+      setDraftShares((current) => {
+        const next = { ...current };
+        delete next[offer.keitaro_offer_id];
+        return next;
+      });
+    }
   }
 
   async function toggleFixed(offer: OfferDetail, isFixed: boolean) {
@@ -250,18 +305,10 @@ export default function EditCampaign({ notify }: Props) {
     );
     if (ok) {
       setOfferSearch("");
-      setOfferResults([]);
-      setCustomOfferId("");
+      setOffersOpen(false);
+      setOfferActive(-1);
+      setOfferReloadNonce((value) => value + 1);
     }
-  }
-
-  async function addCustomOffer() {
-    const raw = customOfferId.trim();
-    if (!/^\d+$/.test(raw) || Number(raw) <= 0) {
-      notify("error", "Offer ID — положительное целое число");
-      return;
-    }
-    await addOffer(Number(raw));
   }
 
   async function upload(force = forceUpload) {
@@ -298,9 +345,59 @@ export default function EditCampaign({ notify }: Props) {
     }
   }
 
-  function selectById(value: string) {
-    const item = remoteCampaigns.find((campaignItem) => campaignItem.id === Number(value));
-    if (item) void selectCampaign(item);
+  function campaignKeys(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setCampaignOpen(false);
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!visibleCampaigns.length) return;
+      event.preventDefault();
+      setCampaignOpen(true);
+      setCampaignActive((current) => event.key === "ArrowDown"
+        ? Math.min(current + 1, visibleCampaigns.length - 1)
+        : Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = visibleCampaigns[campaignActive]
+        ?? (visibleCampaigns.length === 1 ? visibleCampaigns[0] : undefined);
+      if (!selected) return;
+      setCampaignOpen(false);
+      void selectCampaign(selected);
+    }
+  }
+
+  function offerKeys(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setOffersOpen(false);
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!offerOptions.length) return;
+      event.preventDefault();
+      setOffersOpen(true);
+      setOfferActive((current) => event.key === "ArrowDown"
+        ? Math.min(current + 1, offerOptions.length - 1)
+        : Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = offerOptions[offerActive]
+        ?? (offerOptions.length === 1 ? offerOptions[0] : undefined);
+      if (selected) void addOffer(selected.id);
+    }
+  }
+
+  function localStatus(offer: OfferDetail) {
+    if (!offer.is_active) return { text: "Inactive", tone: "error" };
+    if (offer.readonly) return { text: "Read-only", tone: "modified" };
+    if (flow?.sync_status === "error") return { text: "Error", tone: "error" };
+    if (flow?.sync_status === "uploading") return { text: "Uploading", tone: "uploading" };
+    if (flow?.sync_status === "modified") return { text: "Modified", tone: "modified" };
+    return { text: "Active", tone: "active" };
   }
 
   return (
@@ -311,28 +408,50 @@ export default function EditCampaign({ notify }: Props) {
           Выберите кампанию Keitaro. При первом выборе backend выполнит Fetch и создаст локальную копию.
           Изменения сначала сохраняются локально; в Keitaro уходят только по Upload.
         </p>
-        <div className="inline">
+        <div className="picker" ref={campaignPickerRef}>
           <input
-            aria-label="Поиск кампании по названию, alias или ID"
-            value={campaignSearch}
-            onChange={(event) => setCampaignSearch(event.target.value)}
-            placeholder="Поиск по названию, alias или ID"
-          />
-          <select
+            role="combobox"
             aria-label="Кампания Keitaro"
-            value={campaign?.keitaro_id ?? ""}
+            aria-expanded={campaignOpen}
+            aria-controls="campaign-options"
+            aria-autocomplete="list"
+            aria-activedescendant={campaignOpen && campaignActive >= 0 ? `campaign-option-${campaignActive}` : undefined}
+            value={campaignQuery}
+            onChange={(event) => {
+              setCampaignQuery(event.target.value);
+              setCampaignActive(-1);
+              setCampaignOpen(true);
+            }}
+            onFocus={() => { setCampaignOpen(true); setCampaignActive(-1); }}
+            onKeyDown={campaignKeys}
+            placeholder="Поиск по названию, alias или ID"
             disabled={busy !== null}
-            onChange={(event) => selectById(event.target.value)}
-          >
-            <option value="">— выберите кампанию —</option>
-            {campaignLoading && <option disabled>Загрузка списка…</option>}
-            {visibleCampaigns.map((item) => (
-              <option key={item.id} value={item.id} title={`${item.name} (${item.alias})`}>
-                #{item.id} {item.name} ({item.alias}){item.state ? ` · ${item.state}` : ""}
-              </option>
-            ))}
-            {!campaignLoading && !visibleCampaigns.length && <option disabled>Ничего не найдено</option>}
-          </select>
+          />
+          {campaignOpen && (
+            <div className="picker-menu" id="campaign-options" role="listbox">
+              {campaignLoading && <div className="picker-empty">Загрузка списка…</div>}
+              {!campaignLoading && visibleCampaigns.map((item, index) => (
+                <div
+                  key={item.id}
+                  id={`campaign-option-${index}`}
+                  role="option"
+                  aria-selected={campaign?.keitaro_id === item.id}
+                  tabIndex={-1}
+                  className={`picker-option ${index === campaignActive ? "active" : ""} ${campaign?.keitaro_id === item.id ? "selected" : ""}`}
+                  onMouseEnter={() => setCampaignActive(index)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setCampaignOpen(false);
+                    void selectCampaign(item);
+                  }}
+                >
+                  <span>#{item.id} {item.name}</span>
+                  <small>{item.alias}{item.state ? ` · ${item.state}` : ""}</small>
+                </div>
+              ))}
+              {!campaignLoading && !visibleCampaigns.length && <div className="picker-empty">Кампании не найдены</div>}
+            </div>
+          )}
         </div>
 
         {campaign && (
@@ -373,6 +492,10 @@ export default function EditCampaign({ notify }: Props) {
             })}
           </div>
 
+          {!flow && (
+            <p className="muted">Потоки не редактируются: схема не landings. Остальные потоки показаны серыми выше.</p>
+          )}
+
           {flow && (
             <div className="flow-panel">
               <div className="flow-toolbar">
@@ -385,7 +508,6 @@ export default function EditCampaign({ notify }: Props) {
                   </div>
                 </div>
                 <div className="toolbar-actions">
-                  <button disabled={busy !== null} onClick={runFetch}>Fetch</button>
                   <label className="check-line">
                     <input
                       type="checkbox"
@@ -402,42 +524,60 @@ export default function EditCampaign({ notify }: Props) {
               </div>
 
               {flow.last_error && <p className="err">Последняя ошибка: {flow.last_error}</p>}
-              {busy && <p className="muted">Операция: {busy}…</p>}
+              {busy && <p className="muted">Операция: {BUSY_TEXT[busy] ?? "Выполнение"}…</p>}
 
               <div className="table-head">
                 <h3>Offers</h3>
                 <div className="offer-add">
-                  <div className="inline">
+                  <div className="picker" ref={offerPickerRef}>
                     <input
+                      role="combobox"
                       aria-label="Найти оффер для добавления"
+                      aria-expanded={offersOpen}
+                      aria-controls="offer-options"
+                      aria-autocomplete="list"
+                      aria-activedescendant={offersOpen && offerActive >= 0 ? `offer-option-${offerActive}` : undefined}
                       value={offerSearch}
-                      onChange={(event) => setOfferSearch(event.target.value)}
+                      onChange={(event) => {
+                        setOfferSearch(event.target.value);
+                        setOfferActive(-1);
+                        setOffersOpen(true);
+                      }}
+                      onFocus={() => { setOffersOpen(true); setOfferActive(-1); }}
+                      onKeyDown={offerKeys}
                       placeholder="Название или ID оффера"
                       disabled={busy !== null}
                     />
-                    <div className="suggestions inline-suggestions">
-                      {offersLoading && <span className="muted">Загрузка…</span>}
-                      {!offersLoading && offerResults.map((offer) => (
-                        <button key={offer.id} type="button" disabled={busy !== null} onClick={() => addOffer(offer.id)}>
-                          + #{offer.id} {offer.name}
-                        </button>
-                      ))}
-                      {!offersLoading && !offerResults.length && <span className="muted">Ничего не найдено</span>}
-                    </div>
+                    {offersOpen && (
+                      <div className="picker-menu" id="offer-options" role="listbox">
+                        {offersLoading && !offerResults.length && <div className="picker-empty">Загрузка каталога…</div>}
+                        {offerOptions.map((option, index) => (
+                          <div
+                            key={option.id}
+                            id={`offer-option-${index}`}
+                            role="option"
+                            aria-selected={index === offerActive}
+                            tabIndex={-1}
+                            className={`picker-option ${index === offerActive ? "active" : ""}`}
+                            onMouseEnter={() => setOfferActive(index)}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => void addOffer(option.id)}
+                          >
+                            <span>{option.label}</span>
+                            {option.hint && <small>{option.hint}</small>}
+                          </div>
+                        ))}
+                        {customAlreadyAdded && (
+                          <div className="picker-empty">Оффер #{customOfferId} уже в потоке</div>
+                        )}
+                        {!offersLoading && !offerResults.length && <div className="picker-empty">Ничего не найдено</div>}
+                        {!offersLoading && offerResults.length > 0 && !offerOptions.length && !customAlreadyAdded && (
+                          <div className="picker-empty">Все найденные офферы уже добавлены</div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="inline">
-                    <input
-                      aria-label="Произвольный Offer ID"
-                      value={customOfferId}
-                      onChange={(event) => setCustomOfferId(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === "Enter") void addCustomOffer(); }}
-                      placeholder="Произвольный Offer ID"
-                      disabled={busy !== null}
-                    />
-                    <button type="button" disabled={busy !== null || !customOfferId.trim()} onClick={addCustomOffer}>
-                      Добавить по ID
-                    </button>
-                  </div>
+                  <p className="muted offer-hint">Введите название или ID; уже добавленные офферы скрыты.</p>
                 </div>
               </div>
 
@@ -450,66 +590,85 @@ export default function EditCampaign({ notify }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {flow.offers.map((offer) => (
-                      <tr key={offer.id}>
-                        <td>{offer.keitaro_offer_id}</td>
-                        <td>
-                          {offer.name_unavailable
-                            ? <>Offer #{offer.keitaro_offer_id} <span className="muted">(название недоступно)</span></>
-                            : offer.offer_name}
-                        </td>
-                        <td>
-                          <input
-                            className="share-input"
-                            type="number"
-                            min={1}
-                            max={100}
-                            step={1}
-                            title="Целое число от 1 до 100"
-                            aria-label={`Share оффера ${offer.keitaro_offer_id}`}
-                            value={draftShares[offer.keitaro_offer_id] ?? String(offer.share)}
-                            disabled={busy !== null}
-                            onChange={(event) => setDraftShares((current) => ({
-                              ...current, [offer.keitaro_offer_id]: event.target.value,
-                            }))}
-                            onBlur={() => commitShare(offer)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                void commitShare(offer);
-                              }
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Fixed оффера ${offer.keitaro_offer_id}`}
-                            checked={offer.is_fixed}
-                            disabled={busy !== null}
-                            onChange={(event) => toggleFixed(offer, event.target.checked)}
-                          />
-                        </td>
-                        <td><span className="badge active">Active</span></td>
-                        <td>{offer.keitaro_state}</td>
-                        <td>
-                          <button
-                            className="danger"
-                            disabled={busy !== null}
-                            onClick={() => deleteOffer(offer)}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {flow.offers.map((offer) => {
+                      const status = localStatus(offer);
+                      const hasDraft = draftShares[offer.keitaro_offer_id] !== undefined;
+                      return (
+                        <tr key={offer.id}>
+                          <td>{offer.keitaro_offer_id}</td>
+                          <td>
+                            {offer.name_unavailable
+                              ? <>Offer #{offer.keitaro_offer_id} <span className="muted">(название недоступно)</span></>
+                              : offer.offer_name}
+                          </td>
+                          <td>
+                            <div className="share-edit">
+                              <input
+                                className={`share-input ${hasDraft ? "dirty" : ""}`}
+                                type="number"
+                                min={1}
+                                max={100}
+                                step={1}
+                                title="Целое число от 1 до 100; Enter сохраняет изменение"
+                                aria-label={`Share оффера ${offer.keitaro_offer_id}`}
+                                value={draftShares[offer.keitaro_offer_id] ?? String(offer.share)}
+                                disabled={busy !== null}
+                                onChange={(event) => setDraftShares((current) => ({
+                                  ...current, [offer.keitaro_offer_id]: event.target.value,
+                                }))}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    void commitShare(offer);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                disabled={busy !== null || !hasDraft}
+                                onClick={() => void commitShare(offer)}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Fixed оффера ${offer.keitaro_offer_id}`}
+                              checked={offer.is_fixed}
+                              disabled={busy !== null}
+                              onChange={(event) => toggleFixed(offer, event.target.checked)}
+                            />
+                          </td>
+                          <td>
+                            <span
+                              className={`badge ${status.tone}`}
+                              title={offer.readonly ? "Keitaro помечает оффер как доступный только для чтения" : undefined}
+                            >
+                              {status.text}
+                            </span>
+                          </td>
+                          <td>{offer.keitaro_state || "—"}</td>
+                          <td>
+                            <button
+                              className="danger"
+                              disabled={busy !== null}
+                              onClick={() => deleteOffer(offer)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {!flow.offers.length && (
                       <tr><td colSpan={7} className="muted">В потоке нет активных офферов</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
-              <p className="muted share-hint">Share — целое число 1–100; ручной ввод делает оффер Fixed.</p>
+              <p className="muted share-hint">Share — целое число 1–100; ручной ввод делает оффер Fixed. Изменение сохраняется по Enter или кнопке Save.</p>
 
               <h3>Deleted Offers</h3>
               <div className="table-wrap">
@@ -521,7 +680,7 @@ export default function EditCampaign({ notify }: Props) {
                         <td>{offer.keitaro_offer_id}</td>
                         <td>{offer.name_unavailable ? `Offer #${offer.keitaro_offer_id}` : offer.offer_name}</td>
                         <td>{offer.share}</td>
-                        <td>{offer.keitaro_state}</td>
+                        <td>{offer.keitaro_state || "—"}</td>
                         <td>
                           <button
                             disabled={busy !== null}
