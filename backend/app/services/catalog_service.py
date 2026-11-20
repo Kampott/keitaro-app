@@ -1,4 +1,4 @@
-"""Справочники Keitaro и статический список стран (ТЗ §3.2, §6)."""
+"""Справочники Keitaro и статический список стран."""
 import json
 import threading
 import time
@@ -51,7 +51,7 @@ class CatalogService:
             return None
 
     def domains(self) -> list[DomainItem]:
-        """Только активные домены (§3.2): is_ssl нужен для сборки tracking URL."""
+        """Только активные домены: is_ssl нужен для сборки tracking URL."""
         rows = self._as_list(self._client.request("GET", "domains"), "domains")
         result: list[DomainItem] = []
         for row in rows:
@@ -73,7 +73,7 @@ class CatalogService:
         return [x for x in (self._reference(r) for r in rows) if x is not None]
 
     def create_group(self, name: str) -> ReferenceItem:
-        """D4: POST /groups с {name, type: 'campaigns'}, position назначает Keitaro."""
+        """POST /groups с {name, type: 'campaigns'}, position назначает Keitaro."""
         data = self._client.request("POST", "groups", json={"name": name, "type": "campaigns"})
         row = data[0] if isinstance(data, list) and data else data
         if isinstance(row, dict) and row.get("id") is not None:
@@ -109,7 +109,7 @@ class CatalogService:
         return None
 
     def get_offer(self, offer_id: int) -> OfferItem | None:
-        """§4.4: сначала кэш, при промахе — GET /offers/{id}; только активные офферы."""
+        """Сначала кэш, при промахе — GET /offers/{id}; только активные офферы."""
         cached = self.find_offer(offer_id)
         if cached is not None:
             return cached
@@ -136,7 +136,7 @@ class CatalogService:
             self._offers_at = 0.0
 
     def refresh_offers(self) -> list[dict]:
-        """§4.8 п.2: обновить кэш офферов перед Fetch; ошибка Keitaro не даёт пустой список."""
+        """Обновить кэш офферов перед Fetch; ошибка Keitaro не даёт пустой список."""
         self.invalidate_offers()
         return [row for row in self._cached_offers() if isinstance(row, dict)]
 

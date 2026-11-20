@@ -1,4 +1,4 @@
-"""Campaign Editor, этап C: Upload в Keitaro (ТЗ §4.9)."""
+"""Campaign Editor: Upload в Keitaro."""
 import copy
 import json
 from datetime import datetime, timezone

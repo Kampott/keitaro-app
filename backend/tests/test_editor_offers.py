@@ -1,4 +1,4 @@
-"""Campaign Editor, этап B: локальные мутации офферов (ТЗ §4.4–§4.7)."""
+"""Campaign Editor: локальные мутации офферов."""
 from datetime import datetime, timezone
 
 import pytest

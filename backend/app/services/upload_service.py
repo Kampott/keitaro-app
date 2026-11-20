@@ -1,4 +1,4 @@
-"""Upload потока в Keitaro (ТЗ §4.9)."""
+"""Upload потока в Keitaro."""
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -57,7 +57,7 @@ def _remote_offers_match(stream: dict, snapshot: list[dict]) -> bool:
 
 
 def recover_stale_uploads(session: Session) -> int:
-    """§4.9 п.6: зависшие uploading после перезапуска переводятся в error."""
+    """Зависшие uploading после перезапуска переводятся в error."""
     flows = session.scalars(
         select(models.CampaignFlow).where(models.CampaignFlow.sync_status == "uploading")
     ).all()
@@ -75,7 +75,7 @@ def recover_stale_uploads(session: Session) -> int:
 
 
 def _mark_error(session: Session, campaign_id: int, flow_id: int, error: Exception) -> None:
-    """Локальные данные не трогаем, кроме статуса и error-лога (§4.9 п.6)."""
+    """Локальные данные не трогаем, кроме статуса и error-лога."""
     message = error.message if isinstance(error, AppError) else str(error)
     try:
         failed = session.scalar(
@@ -102,7 +102,7 @@ def upload_flow(
     *,
     force: bool = False,
 ):
-    """§4.9: отправить снимок активных офферов и подтвердить результат чтением."""
+    """Отправить снимок активных офферов и подтвердить результат чтением."""
     flow = _flow_or_404(session, flow_id)
     campaign_id = flow.campaign_id
     keitaro_flow_id = flow.keitaro_flow_id
@@ -191,7 +191,7 @@ def upload_flow(
         final.remote_hash = sync_service.flow_remote_hash(verified)
         final.remote_payload = sync_service.stream_request_payload(verified)
         final.last_uploaded_at = _now()
-        # Правки во время uploading не считаются отправленными (§4.9 п.5, п.7).
+        # Правки во время uploading не считаются отправленными.
         final.sync_status = "synced" if final.revision == r0 else "modified"
         session.add(models.SyncLog(
             campaign_id=campaign_id,

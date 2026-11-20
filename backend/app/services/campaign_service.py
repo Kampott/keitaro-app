@@ -1,4 +1,4 @@
-"""Campaign Creator: последовательность §3.5 ТЗ."""
+"""Campaign Creator: создание кампании и потоков."""
 import re
 import secrets
 import string
@@ -30,7 +30,7 @@ def _campaign_body(payload: CampaignCreateRequest, alias: str) -> dict:
         "alias": alias,
         "type": "position",
         "domain_id": payload.domain_id,
-        "group_id": payload.group_id,  # число по §3.4; при отклонении повторяем строкой
+        "group_id": payload.group_id,  # при отклонении повторяем строкой
         "traffic_source_id": payload.source_id,
         "cost_type": "CPC",
         "cost_value": 0,
@@ -151,7 +151,7 @@ def _archive_failed(client: KeitaroClient, info: dict, alias: str, reason: str) 
 
 
 def _tracking_url(domain: DomainItem, alias: str) -> str | None:
-    """§3.6: scheme по is_ssl, имя без пробелов/префикса/слэша; wildcard → None."""
+    """Scheme по is_ssl, имя без пробелов/префикса/слэша; wildcard → None."""
     name = (domain.name or "").strip()
     name = re.sub(r"^https?://", "", name, flags=re.I).strip().rstrip("/")
     if not name or "*" in name:

@@ -1,4 +1,4 @@
-"""Campaign Editor: чтение локального состояния и Fetch (ТЗ §4.8, §4.10)."""
+"""Campaign Editor: чтение локального состояния и Fetch."""
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -37,7 +37,7 @@ def _campaign_or_404(session: Session, campaign_id: int) -> models.Campaign:
 
 
 def campaign_status(flows: list[models.CampaignFlow]) -> str:
-    """Наихудший статус потоков: error > uploading > modified > synced (§4.10)."""
+    """Наихудший статус потоков: error > uploading > modified > synced."""
     if not flows:
         return "synced"
     return max(flows, key=lambda f: _STATUS_RANK.get(f.sync_status, 0)).sync_status
@@ -83,7 +83,7 @@ def _flow_dict(
         "sync_status": flow.sync_status,
         "revision": flow.revision,
         "shares_valid": shares_valid([o.share for o in active]),
-        # frontend отображает сумму из ответа backend и не считает shares сам (§7)
+        # frontend отображает сумму из ответа backend и не считает shares сам
         "shares_sum": sum(o.share for o in active),
         "readonly": readonly,
         "last_error": _last_error(session, flow.id),
@@ -141,7 +141,7 @@ def get_campaign(session: Session, campaign_id: int) -> editor.CampaignDetail:
 
 
 def _write_error_log(session: Session, campaign_id: int, message: str) -> None:
-    """Best-effort: inability to write SyncLog must not mask the original error (§4.8 п.6)."""
+    """Best-effort: inability to write SyncLog must not mask the original error."""
     try:
         with session.begin_nested():
             session.add(models.SyncLog(
@@ -178,7 +178,7 @@ def fetch_campaign(
     *,
     force: bool = False,
 ) -> editor.CampaignDetail:
-    """§4.8: прочитать Keitaro и атомарно заменить локальную копию кампании."""
+    """Прочитать Keitaro и атомарно заменить локальную копию кампании."""
     campaign = _campaign_or_404(session, campaign_id)
     snapshot = {f.id: (f.sync_status, f.revision) for f in campaign.flows}
     _guard(list(campaign.flows), force=force)
@@ -236,7 +236,7 @@ def fetch_campaign(
     existing_by_kf = {f.keitaro_flow_id: f for f in locked_flows}
 
     try:
-        # Поля кампании. domain_id в 11.4 есть в ответе (Phase 0 п.10) — обновляем.
+        # Поля кампании. domain_id в 11.4 есть в ответе — обновляем.
         locked.name = str(remote.get("name") or locked.name)
         locked.alias = str(remote.get("alias") or locked.alias)
         if remote.get("group_id") is not None:
@@ -261,7 +261,7 @@ def fetch_campaign(
                     state=str(stream.get("state") or "active"),
                 )
                 session.add(flow)
-                session.flush()  # офферам нужен уже существующий flow.id (§4.8)
+                session.flush()  # офферам нужен уже существующий flow.id
             flow.name = str(stream.get("name") or "")
             flow.position = _int(stream.get("position"))
             flow.type = str(stream.get("type") or "regular")
@@ -344,7 +344,7 @@ def fetch_new_campaign(
     *,
     force: bool = False,
 ) -> editor.CampaignDetail:
-    """§4.2: первый выбор кампании создаёт локальную копию через Fetch.
+    """Первый выбор кампании создаёт локальную копию через Fetch.
 
     Если локальная кампания уже есть, открываем её обычным Fetch (с проверкой
     LOCAL_CHANGES/BUSY). Иначе сначала убеждаемся, что кампания существует в

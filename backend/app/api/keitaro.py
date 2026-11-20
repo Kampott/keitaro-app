@@ -63,7 +63,7 @@ def groups(catalog: CatalogService = Depends(get_catalog)):
 
 @router.post("/groups", response_model=ReferenceItem, status_code=201)
 def create_group(body: GroupCreate, catalog: CatalogService = Depends(get_catalog)):
-    """D4: создать группу кампаний; position назначает Keitaro."""
+    """Создать группу кампаний; position назначает Keitaro."""
     return catalog.create_group(body.name)
 
 

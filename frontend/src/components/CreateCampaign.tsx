@@ -154,7 +154,7 @@ export default function CreateCampaign({ notify }: Props) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return; // защита от двойного клика (§3.5)
+    if (busy) return; // защита от двойного клика
     if (!form.name.trim() || !form.geo.length || !form.offerIds.length || !form.domainId || !form.groupId || !form.sourceId) {
       notify("error", "Заполните Name, GEO, хотя бы один Offer, Domain, Group и Source");
       return;
@@ -187,7 +187,7 @@ export default function CreateCampaign({ notify }: Props) {
     <div className="grid-two">
       <section className="card">
         <h2>Create Campaign</h2>
-        <p className="muted">Форма §3.2 ТЗ. Кампания и два потока создаются в Keitaro через backend.</p>
+        <p className="muted">Кампания и два потока создаются в Keitaro через backend.</p>
         <form onSubmit={submit}>
           <label className="field">
             <span>Name *</span>

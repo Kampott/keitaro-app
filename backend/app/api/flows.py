@@ -21,5 +21,5 @@ def upload(
     client: KeitaroClient = Depends(get_keitaro),
     session: Session = Depends(get_db),
 ):
-    """Upload выбранного потока в Keitaro (§4.9)."""
+    """Upload выбранного потока в Keitaro."""
     return upload_flow(client, session, flow_id, force=bool(body and body.force))

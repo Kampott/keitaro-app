@@ -1,8 +1,8 @@
-"""Автоматический пересчёт shares офферов потока (ТЗ §4.7, Приложение C).
+"""Автоматический пересчёт shares офферов потока.
 
 Чистая функция: только целые числа, без БД / FastAPI / HTTP / float / Decimal.
-Рабочее значение MIN_SHARE = 1: WRITE-проверка §2.3 п.8 не проводилась.
-Тесты прогоняют ВСЕ векторы Приложения C и для MIN_SHARE = 0.
+Рабочее значение MIN_SHARE = 1.
+Тесты прогоняют все векторы и для MIN_SHARE = 0.
 """
 from dataclasses import dataclass
 from typing import Sequence
@@ -18,7 +18,7 @@ class OfferInput:
     """Один активный локальный оффер в стабильном порядке (created_at, id).
 
     is_new   — только что добавлен/восстановлен: вес берём по остальным;
-    is_pivot — share только что введён вручную: считается закреплённым (D1).
+    is_pivot — share только что введён вручную: считается закреплённым.
     """
     id: int
     share: int
@@ -42,7 +42,7 @@ def calculate_shares(
 ) -> list[Share]:
     """Итоговые shares в том же порядке, что и вход.
 
-    Пустой список — допустимое локальное состояние (шаг 1 §4.7).
+    Пустой список — допустимое локальное состояние.
     Ошибки: INVALID_SHARES, FIXED_SUM_EXCEEDS_100, FIXED_SUM_MUST_BE_100,
     INFEASIBLE_SHARES — все с HTTP 422; вызывающий не меняет свои данные.
     """
@@ -87,7 +87,7 @@ def calculate_shares(
             free=n, remainder=r, min_share=minimum,
         )
 
-    # шаг 6: новый оффер получает целое среднее весов остальных незакреплённых
+    # новый оффер получает целое среднее весов остальных незакреплённых
     weights: list[int] = []
     for i, o in enumerate(free):
         if o.is_new:
@@ -114,7 +114,7 @@ def calculate_shares(
     for i in sorted(range(n), key=lambda k: (-rem[k], k))[:missing]:
         base[i] += 1
 
-    # шаг 9
+    # итоговые доли
     free_shares = {o.id: minimum + b for o, b in zip(free, base)}
     result = [
         Share(o.id, free_shares[o.id])
@@ -127,6 +127,6 @@ def calculate_shares(
 
 
 def shares_valid(shares: Sequence[int], *, min_share: int | None = None) -> bool:
-    """Статус shares_valid из §4.8 п.5 (пустой список → false)."""
+    """Статус shares_valid (пустой список → false)."""
     minimum = MIN_SHARE if min_share is None else min_share
     return bool(shares) and sum(shares) == TOTAL and all(minimum <= s <= TOTAL for s in shares)

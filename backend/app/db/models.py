@@ -1,4 +1,4 @@
-"""Локальные модели редактора (ТЗ §5)."""
+"""Локальные модели редактора."""
 from datetime import datetime
 
 from sqlalchemy import (
@@ -57,7 +57,7 @@ class CampaignFlow(Base):
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     remote_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Полезная часть ответа GET /streams/{id} по схеме StreamRequestPut:
-    # нужна, если частичный PUT с offers затирает остальные поля потока (§2.3 п.6, §4.9).
+    # нужна, если частичный PUT с offers затирает остальные поля потока.
     remote_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

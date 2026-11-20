@@ -1,4 +1,4 @@
-"""Тесты share_calculator: ВСЕ векторы Приложения C при MIN_SHARE = 0 и 1."""
+"""Тесты share_calculator: все векторы при MIN_SHARE = 0 и 1."""
 import random
 
 import pytest

@@ -1,4 +1,4 @@
-"""Схемы Campaign Creator (ТЗ §3.2–§3.6)."""
+"""Схемы Campaign Creator."""
 import re
 
 from pydantic import BaseModel, Field, field_validator, model_validator

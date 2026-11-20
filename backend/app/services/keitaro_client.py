@@ -16,7 +16,7 @@ def _message(body) -> str:
 
 
 class KeitaroClient:
-    """Единственная точка входа в Keitaro Admin API (ТЗ §2.1). Ключ не попадает ни в ответы, ни в ошибки."""
+    """Единственная точка входа в Keitaro Admin API. Ключ не попадает ни в ответы, ни в ошибки."""
 
     def __init__(self, base_url: str, api_key: str):
         self._http = httpx.Client(

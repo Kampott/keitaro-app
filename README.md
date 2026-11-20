@@ -64,7 +64,7 @@ Backend при старте сам выполняет `alembic upgrade head`. Е
 
 | Что | Где | Что должно быть |
 |---|---|---|
-| Интерфейс | http://127.0.0.1:8080 | вкладка **Create Campaign**: GEO (12 строк сразу, остальные по поиску), offer автодополнение (список появляется сразу, можно выбрать несколько офферов), домен/группа/источник, результат с tracking URL; вкладка **Edit Campaign**: выбор кампании Keitaro, потоки, таблица офферов, Add/Delete/Restore (в том числе по произвольному Offer ID), Fixed, сумма shares от backend, Fetch/Upload, Deleted Offers; после мутаций выбранный поток не сбрасывается |
+| Интерфейс | http://127.0.0.1:8080 | вкладка **Create Campaign**: GEO (12 строк сразу, остальные по поиску), offer автодополнение (список появляется сразу, можно выбрать несколько офферов), домен/группа/источник, результат с tracking URL; вкладка **Edit Campaign**: выбор кампании Keitaro, потоки (не-`landings` видны, но серые и недоступны), таблица офферов, Add/Delete/Restore (в том числе по произвольному Offer ID), Fixed, сумма shares от backend, Fetch/Upload, Deleted Offers; после мутаций выбранный поток не сбрасывается |
 | Живость | http://127.0.0.1:8080/healthz | `{"status":"ok","db":true,"keitaro_configured":true}` |
 | Проверка Keitaro | http://127.0.0.1:8000/api/keitaro/ping | `{"ok":true,"campaigns_returned":N}`; `N` = 1, если в трекере есть кампании (значит `limit` работает) |
 | Swagger | http://127.0.0.1:8000/docs | только при `APP_ENV=development`, в production закрыт |

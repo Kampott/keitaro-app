@@ -1,4 +1,4 @@
-"""Чтение удалённого состояния и локальная запись (ТЗ §3.5 шаг 5, §4.8)."""
+"""Чтение удалённого состояния и локальная запись."""
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -27,7 +27,7 @@ _HASH_FIELDS = (
     "action_options", "filters", "offers", "landings",
 )
 
-# Поля схемы StreamRequestPut (Swagger §2.3). Служебные id/created_at/updated_at
+# Поля схемы StreamRequestPut. Служебные id/created_at/updated_at
 # и неописанные в схеме поля не отправляем обратно в Keitaro.
 _STREAM_REQUEST_FIELDS = (
     "campaign_id", "type", "name", "position", "weight", "action_options",

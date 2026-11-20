@@ -1,4 +1,4 @@
-"""Список кампаний Keitaro для выбора в Edit Campaign (ТЗ §4.2)."""
+"""Список кампаний Keitaro для выбора в Edit Campaign."""
 import threading
 import time
 

@@ -1,4 +1,4 @@
-"""Campaign Editor, этап A: чтение и Fetch (ТЗ §4.8, §4.10)."""
+"""Campaign Editor: чтение и Fetch."""
 from datetime import datetime, timezone
 
 import pytest

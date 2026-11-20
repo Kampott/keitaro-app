@@ -1,4 +1,4 @@
-"""Campaign Creator (ТЗ §3.5): моки Keitaro + реальная PostgreSQL."""
+"""Campaign Creator: моки Keitaro + реальная PostgreSQL."""
 import httpx
 import pytest
 import respx

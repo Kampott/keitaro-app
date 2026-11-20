@@ -77,7 +77,7 @@ def first_id(items, env_name):
     return None
 
 def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
-    """Контролируемые WRITE-проверки §2.3: кампания adrobot_discovery_* и архивация в конце."""
+    """Контролируемые WRITE-проверки: кампания adrobot_discovery_* и архивация в конце."""
     group_raw = os.environ.get("KEITARO_DEFAULT_GROUP_ID", "").strip()
     if not group_raw:
         raise SystemExit("Для --allow-write задайте KEITARO_DEFAULT_GROUP_ID в .env")
@@ -145,7 +145,7 @@ def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
             "position": 2,
             "state": "active",
             "collect_clicks": True,
-            # фильтр и action_options добавлены только для проверки п.6; кампания всё равно архивируется
+            # фильтр и action_options добавлены только для проверки; кампания всё равно архивируется
             "filters": [{"name": "country", "mode": "accept", "payload": ["AU"]}],
             "action_options": {"url": url},
             "offers": [{"offer_id": offer_id, "share": 100, "state": "active"}],
@@ -154,7 +154,7 @@ def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
     f1, err1 = attempt(lambda: k.request("POST", "streams", json=flow1_body()))
     f2, err2 = attempt(lambda: k.request("POST", "streams", json=flow2_body()))
 
-    # --- п.3: куда реально попал URL ---
+    # --- куда реально попал URL ---
     if f1 and f1.get("id"):
         raw, e3 = attempt(lambda: k.request("GET", f"streams/{f1['id']}"))
         if raw:
@@ -173,7 +173,7 @@ def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
         else:
             result[3] = ("check", [f"GET потока не удался: {e3}"])
 
-    # --- п.6, п.9, п.8, п.14 ---
+    # --- проверки потоков и офферов ---
     sid = f2.get("id") if f2 else None
     good_offers = {"offers": [{"offer_id": offer_id, "share": 100, "state": "active"}]}
 
@@ -243,7 +243,7 @@ def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
         result[8] = ("check", ["Нет потока для проверки shares"])
         result[14] = ("check", ["Нет потока для проверки offers[].state"])
 
-    # --- п.12: архивация / дубль / restore ---
+    # --- архивация / дубль / restore ---
     def archive(cid_):
         return attempt(lambda: k.request("DELETE", f"campaigns/{cid_}", expect_json=False))
 
@@ -268,7 +268,7 @@ def write_checks(k: KeitaroClient, save, domains, sources, offers) -> dict:
             p12.append(f"restore: принят, state={(cur or {}).get('state', '?')}")
     result[12] = ("ok" if not arch_err else "check", p12)
 
-    # --- п.13: переименование перед финальной архивацией ---
+    # --- переименование перед финальной архивацией ---
     new_alias = secrets.token_hex(4)[:8]
     renamed_body = {"name": f"{name}__failed_{alias}", "alias": new_alias}
     _, ren_err = attempt(lambda: k.request("PUT", f"campaigns/{cid}", json=renamed_body))
@@ -344,7 +344,7 @@ def run(
     if offers and offers[0].get("id") is not None:
         get(f"offers/{offers[0]['id']}", "offer")
 
-    # --- п.7: limit / offset / поиск у GET /campaigns ---
+    # --- limit / offset / поиск у GET /campaigns ---
     sizes, full = {}, []
     for lim in (1, 2, 100, 1000):
         d = get("campaigns", params={"limit": lim})
@@ -367,7 +367,7 @@ def run(
         f"без параметров: {len(cl)} шт.; с `limit`: " + ", ".join(f"{n}→{v}" for n, v in sizes.items()),
         "offset: " + {True: "работает", False: "не работает", None: "не определить (нужно ≥ 2 кампаний)"}[offset_ok],
         "поиск на стороне Keitaro: "
-        + (lst(search) if search else "не найден среди alias/name/search/q: искать на backend по загруженному списку (ТЗ §3.5 шаг 3, §4.2)"),
+        + (lst(search) if search else "не найден среди alias/name/search/q: искать на backend по загруженному списку"),
     )
 
     # --- потоки: просматриваем до N кампаний, ищем эталонные redirect/landings ---
@@ -390,9 +390,9 @@ def run(
     if ref is not None:
         get(f"streams/{ref}", "stream")
     w = write_checks(k, save, domains, sources, offers) if allow_write else {}
-    # --- отчёт по пунктам §2.3 ---
+    # --- отчёт по проверкам ---
     point(1, "Версия Keitaro", "manual",
-          "Keitaro 11.4 (в ТЗ целевая — 10.x): зафиксировано вручную.",
+          "Keitaro 11.4: зафиксировано вручную.",
           "Swagger на трекере: `<трекер>/admin/?object=adminApi`; публичные docs могут быть старее.")
 
     country = next((f for f in filters if "country" in (f.get("value"), f.get("name"))), None)
@@ -420,7 +420,7 @@ def run(
           if landings else f"среди {len(ids)} просмотренных кампаний нет потока schema=landings: нужна эталонная кампания (`--campaign-id`).")
 
     point(5, "Tracking Method: Dynamic Link", "ok",
-          "В форме кампании Keitaro 11.4 поля Tracking Method / Dynamic Link нет: пункт пропущен по ТЗ §2.3 п.5.",
+          "В форме кампании Keitaro 11.4 поля Tracking Method / Dynamic Link нет: проверка пропущена.",
           "В UI есть только «Уникальность», «Срок уникальности» и «API токен» (это Click API token).")
 
     point(6, "PUT только с `offers` не затирает остальные поля потока",
@@ -468,11 +468,11 @@ def run(
 
     points.sort(key=lambda p: p[0])
     md = [
-        "# Keitaro Admin API: контракт (Phase 0)", "",
+        "# Keitaro Admin API: контракт", "",
         f"Сгенерировано `backend/scripts/keitaro_discovery.py` "
         f"({'+WRITE' if allow_write else 'GET'}), {date.today()}. "
         "Повторный запуск перезаписывает файл: руками не править.", "",
-        "| § 2.3 | Пункт | Статус |", "|---|---|---|",
+        "| № | Проверка | Статус |", "|---|---|---|",
     ]
     md += [f"| {n} | {t} | {STATUS[s]} |" for n, t, s, _ in points]
     for n, t, s, lines in points:
@@ -483,14 +483,14 @@ def run(
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Phase 0: сверка контракта Keitaro Admin API (GET; --allow-write включает запись)"
+        description="Сверка контракта Keitaro Admin API (GET; --allow-write включает запись)"
     )
     ap.add_argument("--campaign-id", type=int, help="эталонная кампания: её потоки просматриваются первыми")
     ap.add_argument("--scan", type=int, default=20, help="сколько кампаний просмотреть в поисках потоков (по умолчанию 20)")
     ap.add_argument(
         "--allow-write",
         action="store_true",
-        help="создаёт и архивирует тестовую кампанию adrobot_discovery_* (пп. 3, 6, 8, 12–14)",
+        help="создаёт и архивирует тестовую кампанию adrobot_discovery_*",
     )
     args = ap.parse_args()
     if args.allow_write:

@@ -21,7 +21,7 @@ def create(
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """Создать кампанию Keitaro (§3.5) и подготовить её локальную копию."""
+    """Создать кампанию Keitaro и подготовить её локальную копию."""
     return create_campaign(client, catalog, session, body)
 
 
@@ -32,7 +32,7 @@ def fetch_by_keitaro_id(
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """§4.2: выбрать кампанию Keitaro; при первом выборе создаётся локальная копия."""
+    """Выбрать кампанию Keitaro; при первом выборе создаётся локальная копия."""
     return editor_service.fetch_new_campaign(
         client, catalog, session, body.keitaro_id, force=body.force
     )
@@ -40,13 +40,13 @@ def fetch_by_keitaro_id(
 
 @router.get("", response_model=list[CampaignSummary])
 def list_local(session: Session = Depends(get_db)):
-    """Локальные кампании с агрегированным статусом (§4.10)."""
+    """Локальные кампании с агрегированным статусом."""
     return editor_service.list_campaigns(session)
 
 
 @router.get("/{campaign_id}", response_model=CampaignDetail)
 def get_local(campaign_id: int, session: Session = Depends(get_db)):
-    """Потоки, офферы и статус локальной копии кампании (§4.3, §4.8)."""
+    """Потоки, офферы и статус локальной копии кампании."""
     return editor_service.get_campaign(session, campaign_id)
 
 
@@ -58,7 +58,7 @@ def fetch(
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """Fetch from Keitaro (§4.8); force=true перезаписывает локальные изменения."""
+    """Fetch from Keitaro; force=true перезаписывает локальные изменения."""
     return editor_service.fetch_campaign(client, catalog, session, campaign_id, force=force)
 
 
@@ -71,7 +71,7 @@ def add_offer(
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """§4.4: добавить оффер в поток (из каталога, из Deleted Offers или по произвольному ID)."""
+    """Добавить оффер в поток (из каталога, из Deleted Offers или по произвольному ID)."""
     return offer_service.add_offer(client, catalog, session, campaign_id, flow_id, body.offer_id)
 
 
@@ -82,7 +82,7 @@ def delete_offer(
     offer_id: int,
     session: Session = Depends(get_db),
 ):
-    """§4.5: мягко удалить оффер в Deleted Offers."""
+    """Мягко удалить оффер в Deleted Offers."""
     return offer_service.delete_offer(session, campaign_id, flow_id, offer_id)
 
 
@@ -95,7 +95,7 @@ def restore_offer(
     offer_id: int,
     session: Session = Depends(get_db),
 ):
-    """§4.5: восстановить оффер из Deleted Offers."""
+    """Восстановить оффер из Deleted Offers."""
     return offer_service.restore_offer(session, campaign_id, flow_id, offer_id)
 
 
@@ -107,7 +107,7 @@ def patch_offer(
     body: OfferPatchRequest,
     session: Session = Depends(get_db),
 ):
-    """§4.6: задать share (D1: становится Fixed) или переключить Fixed."""
+    """Задать share (становится Fixed) или переключить Fixed."""
     return offer_service.patch_offer(
         session, campaign_id, flow_id, offer_id,
         share=body.share, is_fixed=body.is_fixed,

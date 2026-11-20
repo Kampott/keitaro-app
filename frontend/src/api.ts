@@ -1,6 +1,6 @@
 /**
- * Общий fetch-клиент. backend отдаёт ошибки в формате {code, message, details?}
- * (ТЗ §8); ключ Keitaro и Basic-пароль здесь не сохраняются на диск.
+ * Общий fetch-клиент. backend отдаёт ошибки в формате {code, message, details?};
+ * ключ Keitaro и Basic-пароль здесь не сохраняются на диск.
  */
 export class ApiError extends Error {
   constructor(

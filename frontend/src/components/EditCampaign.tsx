@@ -71,7 +71,8 @@ export default function EditCampaign({ notify }: Props) {
   }, [notify]);
 
   const flows = campaign?.flows ?? [];
-  const flow = flows.find((item) => item.id === flowId) ?? flows[0] ?? null;
+  const landingFlows = flows.filter((item) => item.schema === "landings");
+  const flow = landingFlows.find((item) => item.id === flowId) ?? landingFlows[0] ?? null;
   const searchText = campaignSearch.trim().toLowerCase();
   const visibleCampaigns = remoteCampaigns.filter((item) =>
     !searchText
@@ -114,11 +115,13 @@ export default function EditCampaign({ notify }: Props) {
 
   function applyDetail(detail: CampaignDetail) {
     setCampaign(detail);
-    // После мутации/Fetch остаёмся на том же потоке, если он ещё существует.
+    // Остаёмся на том же редактируемом потоке, если он ещё есть;
+    // потоки со схемой не landings не выбираются.
+    const landings = detail.flows.filter((item) => item.schema === "landings");
     setFlowId((current) =>
-      detail.flows.some((item) => item.id === current)
+      landings.some((item) => item.id === current)
         ? current
-        : detail.flows[0]?.id ?? null,
+        : landings[0]?.id ?? null,
     );
     setDraftShares({});
   }
@@ -350,17 +353,24 @@ export default function EditCampaign({ notify }: Props) {
         <section className="card">
           <h2>Потоки</h2>
           <div className="flow-tabs">
-            {flows.map((item) => (
-              <button
-                key={item.id}
-                className={`flow-tab ${item.id === flow?.id ? "active" : ""}`}
-                disabled={busy !== null}
-                onClick={() => { setFlowId(item.id); setDraftShares({}); }}
-              >
-                <b>{item.name}</b>
-                <small>{item.schema} · {STATUS_TEXT[item.sync_status] ?? item.sync_status}</small>
-              </button>
-            ))}
+            {flows.map((item) => {
+              const selectable = item.schema === "landings";
+              return (
+                <button
+                  key={item.id}
+                  className={`flow-tab ${item.id === flow?.id ? "active" : ""} ${selectable ? "" : "disabled"}`}
+                  disabled={!selectable || busy !== null}
+                  aria-disabled={!selectable}
+                  tabIndex={selectable ? undefined : -1}
+                  title={selectable ? undefined : "Поток не редактируется: схема не landings"}
+                  onClick={selectable ? () => { setFlowId(item.id); setDraftShares({}); } : undefined}
+                  onContextMenu={selectable ? undefined : (event) => event.preventDefault()}
+                >
+                  <b>{item.name}</b>
+                  <small>{item.schema} · {STATUS_TEXT[item.sync_status] ?? item.sync_status}</small>
+                </button>
+              );
+            })}
           </div>
 
           {flow && (

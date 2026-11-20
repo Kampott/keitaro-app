@@ -1,4 +1,4 @@
-"""remote_payload у потока: исходный StreamRequestPut для fallback при Upload (ТЗ §4.9).
+"""remote_payload у потока: исходный StreamRequestPut для fallback при Upload.
 
 Revision ID: 0003
 Revises: 0002

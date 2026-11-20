@@ -1,4 +1,4 @@
-"""Схемы чтения Campaign Editor (ТЗ §4.3, §4.8, §4.10)."""
+"""Схемы чтения Campaign Editor."""
 from datetime import datetime
 
 from pydantic import BaseModel, Field

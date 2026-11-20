@@ -17,7 +17,7 @@ from app.services import upload_service
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     get_settings()  # fail-closed: без настроенной авторизации production не стартует
-    # §4.9 п.6: зависшие uploading после перезапуска переводим в error. Best-effort:
+    # Зависшие uploading после перезапуска переводим в error. Best-effort:
     # недоступность БД не должна мешать старту (в тестах БД намеренно недоступна).
     try:
         with Session(get_engine()) as session:

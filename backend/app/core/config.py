@@ -45,7 +45,7 @@ def get_settings() -> Settings:
     )
     if not s.database_url:
         raise RuntimeError("DATABASE_URL не задан")
-    # D3, fail-closed: открытый режим только при явном APP_ENV=development
+    # fail-closed: открытый режим только при явном APP_ENV=development
     if s.app_env != "development" and not (s.basic_user and s.basic_password):
         raise RuntimeError(
             "Задайте APP_BASIC_AUTH_USER и APP_BASIC_AUTH_PASSWORD "

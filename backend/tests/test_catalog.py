@@ -1,4 +1,4 @@
-"""Справочники и /api/geo (ТЗ §3.2, §6)."""
+"""Справочники и /api/geo."""
 import json
 
 import respx

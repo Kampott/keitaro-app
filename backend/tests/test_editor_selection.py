@@ -1,4 +1,4 @@
-"""Выбор кампании Editor и первый Fetch (ТЗ §4.2, §6)."""
+"""Выбор кампании Editor и первый Fetch."""
 import httpx
 import pytest
 import respx

@@ -1,4 +1,4 @@
-"""Локальные мутации офферов потока (ТЗ §4.4–§4.7)."""
+"""Локальные мутации офферов потока."""
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -109,7 +109,7 @@ def add_offer(
     flow_id: int,
     offer_id: int,
 ) -> CampaignDetail:
-    """§4.4: добавить оффер или восстановить его из Deleted Offers.
+    """Добавить оффер или восстановить его из Deleted Offers.
 
     Произвольный ID принимается даже если оффера нет в каталоге Keitaro: это
     нужно для локальной проверки Fixed/shares. Название в таком случае берётся
@@ -147,7 +147,7 @@ def add_offer(
             )
             session.add(row)
         else:
-            # §4.4: добавление из архива = restore: прежний share не используется.
+            # Добавление из архива = restore: прежний share не используется.
             row.is_active = True
             row.deleted_at = None
             row.is_fixed = False
@@ -166,7 +166,7 @@ def delete_offer(
     flow_id: int,
     offer_id: int,
 ) -> CampaignDetail:
-    """§4.5: мягкое удаление; последний share сохраняется в архивной строке."""
+    """Мягкое удаление; последний share сохраняется в архивной строке."""
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
         row = _active_offer(session, flow.id, offer_id)
@@ -184,7 +184,7 @@ def restore_offer(
     flow_id: int,
     offer_id: int,
 ) -> CampaignDetail:
-    """§4.5: restore — новый оффер со средним весом, Fixed снят."""
+    """Restore — новый оффер со средним весом, Fixed снят."""
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
         row = session.scalar(
@@ -201,7 +201,7 @@ def restore_offer(
         row.is_active = True
         row.deleted_at = None
         row.is_fixed = False
-        row.share = 0  # §4.5: прежний share в расчёте не участвует
+        row.share = 0  # прежний share в расчёте не участвует
         session.flush()
         return _finish(session, flow, campaign_id, new_ids={row.id})
     except Exception:
@@ -218,7 +218,7 @@ def patch_offer(
     share: int | None = None,
     is_fixed: bool | None = None,
 ) -> CampaignDetail:
-    """§4.6: ручной ввод share делает оффер закреплённым (D1)."""
+    """Ручной ввод share делает оффер закреплённым."""
     if share is None and is_fixed is None:
         raise AppError("INVALID_REQUEST", "Пустой PATCH", 422)
     if share is not None and is_fixed is False:

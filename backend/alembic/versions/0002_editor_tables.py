@@ -1,4 +1,4 @@
-"""campaigns, campaign_flows, campaign_offers, sync_logs (ТЗ §5)
+"""campaigns, campaign_flows, campaign_offers, sync_logs
 
 Revision ID: 0002
 Revises: 0001
