@@ -2,7 +2,7 @@
 
 Веб-обёртка над Keitaro Admin API: создание кампаний с двумя потоками и редактирование офферов (ТЗ v2.3).
 
-**Состояние:** Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro, справочники/GEO, Campaign Creator (`POST /api/campaigns`, один или несколько офферов) и локальная копия созданных кампаний работают; расчёт shares готов. Campaign Editor: чтение (`GET /api/campaigns`, `GET /api/campaigns/{id}`), выбор кампании Keitaro (`GET /api/keitaro/campaigns`, кэш 30 с, `POST /api/campaigns/fetch`), Fetch (`POST /api/campaigns/{id}/fetch`), локальные мутации офферов (Add/Delete/Restore/Fixed/PATCH) и Upload (`POST /api/flows/{flow_id}/upload`). Все мутации и Upload всегда разрешены: демо-переключателя и `FLOW_READONLY`-блокировки больше нет. В Edit Campaign можно добавить произвольный Offer ID, даже если оффера нет в каталоге. Frontend (§7) реализован: две вкладки с реальными формами, таблицей офферов, уведомлениями и подтверждениями dangerous-действий. WRITE-проверки на живом трекере ассистентом не выполнялись (Phase 0 только GET). Что сделано по пунктам ТЗ: раздел «Статус реализации» в самом ТЗ.
+**Состояние:** Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro, справочники/GEO, Campaign Creator (`POST /api/campaigns`, один или несколько офферов) и локальная копия созданных кампаний работают; расчёт shares готов. Campaign Editor: чтение (`GET /api/campaigns`, `GET /api/campaigns/{id}`), выбор кампании Keitaro (`GET /api/keitaro/campaigns`, кэш 30 с, `POST /api/campaigns/fetch`), Fetch (`POST /api/campaigns/{id}/fetch`), локальные мутации офферов (Add/Delete/Restore/Fixed/PATCH) и Upload (`POST /api/flows/{flow_id}/upload`). Все мутации и Upload всегда разрешены: демо-переключателя и `FLOW_READONLY`-блокировки больше нет. В Edit Campaign можно добавить произвольный Offer ID, даже если оффера нет в каталоге. Frontend (§7) реализован: две вкладки с реальными формами, таблицей офферов, уведомлениями и подтверждениями dangerous-действий. WRITE-проверки на живом трекере выполнены владельцем в браузере; ассистент WRITE не выполнял. Что сделано по пунктам: раздел «Статус реализации» в статусном документе.
 
 ## Технологии
 
@@ -28,10 +28,9 @@ backend/
   app/services/campaign_service.py последовательность создания (ТЗ §3.5)
   app/services/sync_service.py     Fetch и запись локальной копии
   alembic/                миграции (0001 пустая, 0002 — таблицы редактора, 0003 — remote_payload потока)
-  scripts/keitaro_discovery.py     Phase 0: сверка контракта Keitaro (только GET)
-  tests/                  pytest; tests/fixtures/keitaro/ создаётся discovery-скриптом
+  tests/                  pytest; tests/fixtures/keitaro/ — снимок ответов Keitaro после завершённой сверки
   pytest.ini
-docs/keitaro_contract.md  генерируется discovery-скриптом
+docs/keitaro_contract.md  отчёт по завершённой сверке контракта Keitaro
 docs/keitaro_write_api.md выжимка write-эндпоинтов из Swagger (для разработки)
 docs/keitaro_openapi.yaml Swagger-спецификация Keitaro, сохранённая из Swagger UI
 docs/keitaro_openapi.json её нормализованная JSON-копия
@@ -155,47 +154,29 @@ docker compose build frontend
 # внутри образа выполняется: npm ci && npm run build (tsc --noEmit && vite build)
 ```
 
-Тесты используют отдельную PostgreSQL-БД `<DATABASE_URL>_test` (по умолчанию `adrobot_test`, можно переопределить `TEST_DATABASE_URL`); SQLite не используется. Keitaro мокается (`respx`), реальный ключ не нужен; WRITE-вызовы в живой трекер тестами не выполняются. Покрыто: клиент Keitaro (нормализация ошибок, повторы только для GET), Basic auth и fail-closed старт, discovery-скрипт, модели/миграции, справочники и GEO, расчёт shares, Campaign Creator (успех, один и несколько офферов с равными целыми shares, дубли alias/name и дубли offer_id, таймаут и поиск по alias, архивация при частичной ошибке, отказ архивировать при ошибке чтения/БД, варианты tracking URL), Editor Fetch (чтение и агрегированный статус, force/BUSY, ошибки API, контроль revision, архивные офферы и потоки), Editor Offers (пересчёт shares, включая выравнивание долей после удаления при `MIN_SHARE = 0` и `1`, дубли, restore, Fixed и D1, произвольные Offer ID с подстановкой имени, мутации потоков с неактивными офферами и не-`landings` схемой, ошибки Fixed, блокировки), Editor Upload (partial/full PUT, REMOTE_CHANGED и force, ARCHIVED/BUSY/EMPTY_FLOW/INVALID_SHARES, контрольное чтение, error-log, зависшие uploading, Upload потоков с неактивными офферами), Editor Selection (список кампаний Keitaro и первый Fetch, кэш списка 30 с). Полный прогон: **150 passed**. Frontend: `docker compose build frontend` проходит (`tsc --noEmit && vite build`); в браузере проверены отсутствие блока «Статус» и демо-переключателя, автодополнение офферов на пустом поиске, несколько выбранных офферов при создании, произвольный Offer ID и активные элементы не-`landings` потока в Editor, внутреннее модальное подтверждение удаления вместо браузерного диалога, 12 вместо 249 GEO-чекбоксов, cache hit списка кампаний (~25 мс), console errors = 0.
+Тесты используют отдельную PostgreSQL-БД `<DATABASE_URL>_test` (по умолчанию `adrobot_test`, можно переопределить `TEST_DATABASE_URL`); SQLite не используется. Keitaro мокается (`respx`), реальный ключ не нужен; WRITE-вызовы в живой трекер тестами не выполняются (WRITE в браузере проверен владельцем). Покрыто: клиент Keitaro (нормализация ошибок, повторы только для GET), Basic auth и fail-closed старт, модели/миграции, справочники и GEO, расчёт shares, Campaign Creator (успех, один и несколько офферов с равными целыми shares, дубли alias/name и дубли offer_id, таймаут и поиск по alias, архивация при частичной ошибке, отказ архивировать при ошибке чтения/БД, варианты tracking URL), Editor Fetch (чтение и агрегированный статус, force/BUSY, ошибки API, контроль revision, архивные офферы и потоки), Editor Offers (пересчёт shares, включая выравнивание долей после удаления при `MIN_SHARE = 0` и `1`, дубли, restore, Fixed и D1, произвольные Offer ID с подстановкой имени, мутации потоков с неактивными офферами и не-`landings` схемой, ошибки Fixed, блокировки), Editor Upload (partial/full PUT, REMOTE_CHANGED и force, ARCHIVED/BUSY/EMPTY_FLOW/INVALID_SHARES, контрольное чтение, error-log, зависшие uploading, Upload потоков с неактивными офферами), Editor Selection (список кампаний Keitaro и первый Fetch, кэш списка 30 с). Полный прогон: **147 passed**. Frontend: `docker compose build frontend` проходит (`tsc --noEmit && vite build`); в браузере проверены отсутствие блока «Статус» и демо-переключателя, автодополнение офферов на пустом поиске, несколько выбранных офферов при создании, произвольный Offer ID и активные элементы не-`landings` потока в Editor, внутреннее модальное подтверждение удаления вместо браузерного диалога, 12 вместо 249 GEO-чекбоксов, cache hit списка кампаний (~25 мс), console errors = 0.
 
-## Phase 0: сверка с вашим Keitaro
+## Сверка с вашим Keitaro
 
-Скрипт `backend/scripts/keitaro_discovery.py` только читает данные (GET), в трекере ничего не создаёт и не меняет. Он проверяет по ТЗ §2.3 всё, что можно проверить чтением, сохраняет обезличенные ответы в `backend/tests/fixtures/keitaro/` и пишет отчёт `docs/keitaro_contract.md`.
-
-```bash
-# вариант 1: Docker (файлы попадут прямо в репозиторий)
-docker compose run --rm --no-deps -v "${PWD}:/repo" -w /repo/backend backend python -m scripts.keitaro_discovery
-
-# вариант 2: локально (venv из «Запуск без Docker»)
-cd backend
-set -a; . ../.env; set +a
-python -m scripts.keitaro_discovery
-```
-
-Параметры: `--campaign-id ID` (кампания-эталон: её потоки смотрятся первыми), `--scan N` (сколько кампаний просмотреть в поисках потоков, по умолчанию 20). На Linux после запуска через Docker файлы принадлежат root: `sudo chown -R $USER: docs backend/tests/fixtures`.
-
-Как читать `docs/keitaro_contract.md`: в начале таблица по 14 пунктам ТЗ §2.3.
+Сверка контракта завершена: GET-проверки выполнены по эталонной кампании 216227, WRITE-проверки (`POST /campaigns`, частичный `PUT /streams/{id}`, архивация/переименование, Upload) владелец выполнил в браузере и подтвердил, что всё работает. Скрипт `backend/scripts/keitaro_discovery.py` после завершения удалён из проекта и больше не нужен. Отчёт `docs/keitaro_contract.md` и обезличенные ответы в `backend/tests/fixtures/keitaro/` остаются как снимок: они нужны тестам и для справки, но не перегенерируются.
 
 | Статус | Значение |
 |---|---|
-| ✅ подтверждено | ответ Keitaro совпал с ожиданием ТЗ |
-| 🟡 / ⏳ | нужна проверка записью (`--allow-write`, пока не реализован: он создаёт и архивирует кампании в трекере) |
+| ✅ подтверждено | ответ Keitaro совпал с ожиданием или WRITE-проверка выполнена в браузере |
 | ✋ вручную | версия Keitaro и Tracking Method: смотри в админке, в отчёте есть подсказки |
-| ⚠️ не подтвердилось | смотри детали пункта: чаще всего в трекере нет подходящих кампаний |
 
-Пункты 3 и 4 (куда класть URL редиректа, `action_type` у потока с офферами) подтверждаются по существующим кампаниям. Если среди просмотренных нет потока `redirect` или `landings`, создай в UI Keitaro кампанию-эталон с такими потоками и запусти с `--campaign-id`.
-
-**Перед коммитом фикстур.** `token` кампаний и все URL в `action_options`/`action_payload` заменяются на `REDACTED`, списки режутся до 3 элементов, но названия кампаний, офферов и доменов остаются как есть. Если репозиторий публичный, просмотри `backend/tests/fixtures/keitaro/`.
+Пункты 3 и 4 (куда класть URL редиректа, `action_type` у потока с офферами) подтверждены по существующим кампаниям и Swagger. Частичный PUT оставлен с контрольным чтением и fallback на полный `StreamRequestPut` как защита от расхождений API, даже после успешной WRITE-проверки. `token` кампаний и URL в `action_options`/`action_payload` в фикстурах заменены на `REDACTED`.
 
 ## Интеграция с Keitaro
 
-На целевом трекере установлен **Keitaro 11.4**. Результаты Phase 0 (GET-проверки по §2.3 ТЗ, эталонная кампания 216227) — в `docs/keitaro_contract.md`; write-эндпоинты из сохранённой Swagger-спецификации разобраны в `docs/keitaro_write_api.md` (`docs/keitaro_openapi.yaml` / `.json`). WRITE-проверки на живом трекере не проводились: работает консервативный набор решений (`MIN_SHARE = 1`, partial PUT → fallback полного PUT, переименование `name`/`alias` перед архивацией). По прямому указанию владельца блокировка потоков с неактивными `offers[].state` снята: `readonly` остаётся информационным полем и не запрещает мутации и Upload.
+На целевом трекере установлен **Keitaro 11.4**. Результаты Phase 0 (GET-проверки по §2.3 ТЗ, эталонная кампания 216227) — в `docs/keitaro_contract.md`; write-эндпоинты из сохранённой Swagger-спецификации разобраны в `docs/keitaro_write_api.md` (`docs/keitaro_openapi.yaml` / `.json`). WRITE-проверки на живом трекере выполнены владельцем в браузере; консервативный набор решений оставлен как защита (`MIN_SHARE = 1`, partial PUT → fallback полного PUT, переименование `name`/`alias` перед архивацией). По прямому указанию владельца блокировка потоков с неактивными `offers[].state` снята: `readonly` остаётся информационным полем и не запрещает мутации и Upload.
 
 ### Особенности Keitaro API (кратко, подробности в ТЗ, Приложение A)
 
 - Ключ в заголовке `Api-Key`, базовый путь `/admin_api/v1/`.
 - Ошибки приходят по-разному: HTTP 200/400 с `{"error": ...}`, 406/422 с `{поле: [сообщения]}`, 402 означает, что Admin API нет в редакции. Клиент приводит всё к одному виду.
 - `GET /offers` отдаёт весь каталог без фильтров и страниц; `GET /groups` требует `type`.
-- `PUT /streams/{id}` с `offers` декларативный: пропущенные офферы удаляются. Частичный PUT на живом трекере не проверялся, поэтому после него делается контрольное чтение; если фильтры/лендинги/`action_*` затёрлись, отправляется полный `StreamRequestPut` (сохранённый `remote_payload` + свежий GET).
+- `PUT /streams/{id}` с `offers` декларативный: пропущенные офферы удаляются. Частичный PUT на живом трекере проверен владельцем, но после него всё равно делается контрольное чтение; если фильтры/лендинги/`action_*` затёрлись, отправляется полный `StreamRequestPut` (сохранённый `remote_payload` + свежий GET).
 - `POST /campaigns` не идемпотентен, поэтому клиент не повторяет POST/PUT/DELETE автоматически.
 - `GET /campaigns/{id}` в Keitaro 11.4 возвращает `domain_id` (в ТЗ v2.3 предполагалось обратное): поле в БД nullable, Fetch обновляет его из ответа, Creator сохраняет из запроса.
 - `PUT /streams/{id}` принимает полный `StreamObject`; API не даёт версионирования, поэтому защита от чужих правок между чтением и записью — best-effort.
