@@ -47,9 +47,13 @@ input, select {
   background: #fff;
 }
 input[type="checkbox"] { width: auto; margin-right: 6px; }
+/* Share вводится только целыми числами: стрелки мешают и занимают место. */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .share-input { width: 80px; text-align: right; }
 .inline { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.inline input { flex: 1; }
+.inline input, .inline select { flex: 1; min-width: 0; }
 .check-line { display: flex; align-items: center; font-size: 13px; padding: 3px 0; cursor: pointer; }
 
 .geo-list {
@@ -73,6 +77,9 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 .err { color: #b42318; }
 .warn { color: #9a6700; background: #fff8e5; border-left: 3px solid #e3b341; padding: 8px 10px; }
 .muted { color: #6b7280; font-size: 13px; }
+.demo-note { background: #eaf2ff; border-left: 3px solid #1f6feb; padding: 8px 10px; border-radius: 4px; }
+.share-hint { margin: 4px 0 10px; }
+.geo-hint { margin: 4px 0 0; }
 code { background: #f0f2f5; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
 
 .result p { margin: 6px 0; }

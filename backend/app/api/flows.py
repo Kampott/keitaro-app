@@ -18,8 +18,15 @@ class UploadRequest(BaseModel):
 def upload(
     flow_id: int,
     body: UploadRequest | None = None,
+    allow_readonly: bool = False,
     client: KeitaroClient = Depends(get_keitaro),
     session: Session = Depends(get_db),
 ):
-    """Upload выбранного потока в Keitaro (§4.9)."""
-    return upload_flow(client, session, flow_id, force=bool(body and body.force))
+    """Upload выбранного потока в Keitaro (§4.9).
+
+    `allow_readonly=true` — демо-режим снятия FLOW_READONLY для проверки UI.
+    """
+    return upload_flow(
+        client, session, flow_id,
+        force=bool(body and body.force), allow_readonly=allow_readonly,
+    )

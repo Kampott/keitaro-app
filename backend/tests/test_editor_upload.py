@@ -156,6 +156,22 @@ def test_upload_happy_path_partial_put(client, session):
     assert len(logs) == 1 and logs[0].status == "success"
 
 
+def test_upload_readonly_flow_allowed_with_demo_flag(client, session):
+    c, f = make_campaign(session, schema="redirect")
+    remote = Remote()
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        remote.install(m)
+        denied = client.post(f"/api/flows/{f.id}/upload", json={}, auth=AUTH)
+        allowed = client.post(
+            f"/api/flows/{f.id}/upload?allow_readonly=true", json={}, auth=AUTH
+        )
+
+    assert denied.status_code == 422 and denied.json()["code"] == "FLOW_READONLY"
+    assert allowed.status_code == 200, allowed.text
+    assert len(remote.puts) == 1
+    assert flow_of(allowed.json())["sync_status"] == "synced"
+
+
 def test_remote_changed_requires_force(client, session):
     c, f = make_campaign(session)
     remote = Remote()

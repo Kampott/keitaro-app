@@ -43,10 +43,14 @@ def _lock_flow(session: Session, campaign_id: int, flow_id: int) -> models.Campa
     return flow
 
 
-def _assert_editable(session: Session, flow: models.CampaignFlow) -> None:
+def _assert_editable(
+    session: Session, flow: models.CampaignFlow, *, allow_readonly: bool = False
+) -> None:
     # Поток редактируется только со схемой landings и без офферов в неактивном
-    # состоянии Keitaro (§4.2). Проверяем и архивные строки тоже; запрос в БД,
-    # а не связь flow.offers, чтобы не полагаться на кэш сессии.
+    # состоянии Keitaro (§4.2). Демо-флаг allow_readonly снимает это ограничение
+    # по просьбе владельца задания: оно нужно, чтобы попробовать функционал через UI.
+    if allow_readonly:
+        return
     if flow.schema != "landings" or any(
         o.keitaro_state != "active" for o in _offers(session, flow.id)
     ):
@@ -121,9 +125,13 @@ def add_offer(
     campaign_id: int,
     flow_id: int,
     offer_id: int,
+    *,
+    allow_readonly: bool = False,
 ) -> CampaignDetail:
     """§4.4: добавить оффер или восстановить его из Deleted Offers."""
-    _assert_editable(session, _flow_or_404(session, campaign_id, flow_id))
+    _assert_editable(
+        session, _flow_or_404(session, campaign_id, flow_id), allow_readonly=allow_readonly
+    )
 
     found = catalog.get_offer(offer_id)  # сетевой вызов до захвата блокировки
     if found is None:
@@ -131,7 +139,7 @@ def add_offer(
 
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
-        _assert_editable(session, flow)
+        _assert_editable(session, flow, allow_readonly=allow_readonly)
         row = session.scalar(
             select(models.CampaignOffer).where(
                 models.CampaignOffer.flow_id == flow.id,
@@ -168,12 +176,17 @@ def add_offer(
 
 
 def delete_offer(
-    session: Session, campaign_id: int, flow_id: int, offer_id: int
+    session: Session,
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+    *,
+    allow_readonly: bool = False,
 ) -> CampaignDetail:
     """§4.5: мягкое удаление; последний share сохраняется в архивной строке."""
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
-        _assert_editable(session, flow)
+        _assert_editable(session, flow, allow_readonly=allow_readonly)
         row = _active_offer(session, flow.id, offer_id)
         row.is_active = False
         row.deleted_at = _now()
@@ -184,12 +197,17 @@ def delete_offer(
 
 
 def restore_offer(
-    session: Session, campaign_id: int, flow_id: int, offer_id: int
+    session: Session,
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+    *,
+    allow_readonly: bool = False,
 ) -> CampaignDetail:
     """§4.5: restore — новый оффер со средним весом, Fixed снят."""
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
-        _assert_editable(session, flow)
+        _assert_editable(session, flow, allow_readonly=allow_readonly)
         row = session.scalar(
             select(models.CampaignOffer).where(
                 models.CampaignOffer.flow_id == flow.id,
@@ -220,6 +238,7 @@ def patch_offer(
     *,
     share: int | None = None,
     is_fixed: bool | None = None,
+    allow_readonly: bool = False,
 ) -> CampaignDetail:
     """§4.6: ручной ввод share делает оффер закреплённым (D1)."""
     if share is None and is_fixed is None:
@@ -230,7 +249,7 @@ def patch_offer(
         )
     try:
         flow = _lock_flow(session, campaign_id, flow_id)
-        _assert_editable(session, flow)
+        _assert_editable(session, flow, allow_readonly=allow_readonly)
         row = _active_offer(session, flow.id, offer_id)
         pivot_ids: set[int] = set()
         if share is not None:

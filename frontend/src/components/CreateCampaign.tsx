@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, describeError, query } from "../api";
+import { api, ApiError, describeError, query } from "../api";
 import type {
   CampaignCreateResult, Country, Defaults, DomainItem, Notify,
   OfferItem, ReferenceItem,
@@ -59,26 +59,46 @@ export default function CreateCampaign({ notify }: Props) {
     };
   }, [notify]);
 
+  // Пустой/короткий запрос не дёргает Keitaro: список офферов большой.
   useEffect(() => {
+    const term = offerSearch.trim();
+    if (!/^\d+$/.test(term) && term.length < 2) {
+      setOffers([]);
+      return;
+    }
     let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const rows = await api<OfferItem[]>(`/api/keitaro/offers${query({ search: offerSearch, limit: 20 })}`);
+        const rows = await api<OfferItem[]>(
+          `/api/keitaro/offers${query({ search: term, limit: 20 })}`,
+          { signal: controller.signal },
+        );
         if (!cancelled) setOffers(rows);
       } catch (error) {
-        if (!cancelled) notify("error", `Офферы недоступны: ${describeError(error)}`);
+        if (!cancelled && !(error instanceof ApiError && error.code === "NETWORK" && controller.signal.aborted)) {
+          notify("error", `Офферы недоступны: ${describeError(error)}`);
+        }
       }
     }, 250);
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [offerSearch, notify]);
 
-  const filteredCountries = countries.filter((country) => {
-    const q = geoSearch.trim().toLowerCase();
-    return !q || country.code.toLowerCase().includes(q) || country.name.toLowerCase().includes(q);
-  });
+  const geoQuery = geoSearch.trim().toLowerCase();
+  const filteredCountries = countries.filter((country) =>
+    !geoQuery || country.code.toLowerCase().includes(geoQuery) || country.name.toLowerCase().includes(geoQuery));
+  // Не рендерим все 249 чекбоксов: сначала выбранные, затем первые 12 страны.
+  // Поиск показывает до 20 совпадений — нужную страну всегда можно найти.
+  const visibleCountries = geoQuery
+    ? filteredCountries.slice(0, 20)
+    : [
+        ...filteredCountries.filter((country) => form.geo.includes(country.code)),
+        ...filteredCountries.filter((country) => !form.geo.includes(country.code)).slice(0, 12),
+      ];
 
   function toggleGeo(code: string) {
     setForm((current) => ({
@@ -164,7 +184,7 @@ export default function CreateCampaign({ notify }: Props) {
               placeholder="Например: AU или Australia"
             />
             <div className="geo-list">
-              {filteredCountries.map((country) => (
+              {visibleCountries.map((country) => (
                 <label key={country.code} className="check-line">
                   <input
                     type="checkbox"
@@ -176,6 +196,10 @@ export default function CreateCampaign({ notify }: Props) {
               ))}
               {!filteredCountries.length && <span className="muted">Страны не найдены</span>}
             </div>
+            <p className="muted geo-hint">
+              Показано {visibleCountries.length} из {filteredCountries.length}.
+              {!geoQuery && " Уточните поиск, чтобы выбрать другую страну."}
+            </p>
             <div className="chips">
               {form.geo.map((code) => (
                 <button key={code} type="button" className="chip" onClick={() => toggleGeo(code)}>
@@ -190,7 +214,18 @@ export default function CreateCampaign({ notify }: Props) {
             {selectedOffer && (
               <div className="selected">
                Выбрано: #{selectedOffer.id} — {selectedOffer.name}{" "}
-               <button type="button" className="link" onClick={() => setSelectedOffer(null)}>сменить</button>
+               <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    setSelectedOffer(null);
+                    setForm((current) => ({ ...current, offerId: 0 }));
+                    setOfferSearch("");
+                    setOffers([]);
+                  }}
+                >
+                  сменить
+                </button>
               </div>
             )}
             {!selectedOffer && (
@@ -208,6 +243,8 @@ export default function CreateCampaign({ notify }: Props) {
                       onClick={() => {
                         setSelectedOffer(offer);
                         setForm((current) => ({ ...current, offerId: offer.id }));
+                        setOfferSearch("");
+                        setOffers([]);
                       }}
                     >
                       #{offer.id} — {offer.name}

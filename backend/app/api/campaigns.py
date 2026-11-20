@@ -67,30 +67,49 @@ def add_offer(
     campaign_id: int,
     flow_id: int,
     body: OfferAddRequest,
+    allow_readonly: bool = False,
     client: KeitaroClient = Depends(get_keitaro),
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """§4.4: добавить оффер в поток (из каталога или из Deleted Offers)."""
-    return offer_service.add_offer(client, catalog, session, campaign_id, flow_id, body.offer_id)
+    """§4.4: добавить оффер в поток (из каталога или из Deleted Offers).
+
+    `allow_readonly=true` — демо-режим: разрешает мутации читаемых потоков (§4.2).
+    """
+    return offer_service.add_offer(
+        client, catalog, session, campaign_id, flow_id, body.offer_id,
+        allow_readonly=allow_readonly,
+    )
 
 
 @router.delete("/{campaign_id}/flows/{flow_id}/offers/{offer_id}", response_model=CampaignDetail)
 def delete_offer(
-    campaign_id: int, flow_id: int, offer_id: int, session: Session = Depends(get_db)
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+    allow_readonly: bool = False,
+    session: Session = Depends(get_db),
 ):
     """§4.5: мягко удалить оффер в Deleted Offers."""
-    return offer_service.delete_offer(session, campaign_id, flow_id, offer_id)
+    return offer_service.delete_offer(
+        session, campaign_id, flow_id, offer_id, allow_readonly=allow_readonly
+    )
 
 
 @router.post(
     "/{campaign_id}/flows/{flow_id}/offers/{offer_id}/restore", response_model=CampaignDetail
 )
 def restore_offer(
-    campaign_id: int, flow_id: int, offer_id: int, session: Session = Depends(get_db)
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+    allow_readonly: bool = False,
+    session: Session = Depends(get_db),
 ):
     """§4.5: восстановить оффер из Deleted Offers."""
-    return offer_service.restore_offer(session, campaign_id, flow_id, offer_id)
+    return offer_service.restore_offer(
+        session, campaign_id, flow_id, offer_id, allow_readonly=allow_readonly
+    )
 
 
 @router.patch("/{campaign_id}/flows/{flow_id}/offers/{offer_id}", response_model=CampaignDetail)
@@ -99,10 +118,11 @@ def patch_offer(
     flow_id: int,
     offer_id: int,
     body: OfferPatchRequest,
+    allow_readonly: bool = False,
     session: Session = Depends(get_db),
 ):
     """§4.6: задать share (D1: становится Fixed) или переключить Fixed."""
     return offer_service.patch_offer(
         session, campaign_id, flow_id, offer_id,
-        share=body.share, is_fixed=body.is_fixed,
+        share=body.share, is_fixed=body.is_fixed, allow_readonly=allow_readonly,
     )

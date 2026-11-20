@@ -12,6 +12,7 @@ from app.api.deps import get_catalog, get_keitaro
 from app.core.config import get_settings
 from app.db import models  # noqa: F401 — регистрация моделей в Base.metadata
 from app.db.database import Base, get_engine
+from app.services import keitaro_campaign_service
 
 
 def _load_env_file():
@@ -33,6 +34,7 @@ _load_env_file()
 def _reset():
     for f in (get_settings, get_keitaro, get_catalog, get_engine):
         f.cache_clear()
+    keitaro_campaign_service.invalidate_cache()
 
 
 @pytest.fixture(autouse=True)

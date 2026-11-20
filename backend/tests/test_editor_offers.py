@@ -251,6 +251,27 @@ def test_readonly_flow_rejects_all_mutations(client, session, schema, state):
     assert session.get(models.CampaignFlow, f.id).revision == 3
 
 
+def test_readonly_flow_mutations_allowed_with_demo_flag(client, session):
+    """По просьбе владельца: UI может снять FLOW_READONLY для проверки функционала."""
+    c, f = make_campaign(session, schema="redirect", offers=[
+        dict(koi=18813, name="Flexacil", share=100, fixed=False, active=True, state="disabled"),
+    ])
+    base = f"/api/campaigns/{c.id}/flows/{f.id}"
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_offers(m)
+        denied = client.post(f"{base}/offers", json={"offer_id": 40004}, auth=AUTH)
+        added = client.post(
+            f"{base}/offers?allow_readonly=true", json={"offer_id": 40004}, auth=AUTH
+        )
+
+    assert denied.status_code == 422 and denied.json()["code"] == "FLOW_READONLY"
+    assert added.status_code == 200, added.text
+    flow = flow_of(added.json())
+    assert 40004 in shares(flow)
+    assert flow["shares_valid"] is True
+    assert session.get(models.CampaignFlow, f.id).revision == 4
+
+
 def test_fixed_sum_exceeds_100_rejected(client, session):
     c, f = make_campaign(session, offers=[
         dict(koi=18813, name="A", share=60, fixed=True, active=True),

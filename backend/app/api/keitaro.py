@@ -27,10 +27,16 @@ def remote_campaigns(
     search: str = "",
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    refresh: bool = False,
     client: KeitaroClient = Depends(get_keitaro),
 ):
-    """Кампании Keitaro для выбора в Editor; поиск по name/alias/ID на backend."""
-    return keitaro_campaign_service.list_remote(client, search=search, limit=limit, offset=offset)
+    """Кампании Keitaro для выбора в Editor; поиск по name/alias/ID на backend.
+
+    Список кэшируется 30 с, чтобы поиск в UI не дёргал Keitaro на каждую букву.
+    """
+    return keitaro_campaign_service.list_remote(
+        client, search=search, limit=limit, offset=offset, refresh=refresh
+    )
 
 
 @router.get("/defaults", response_model=Defaults)

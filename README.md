@@ -2,7 +2,7 @@
 
 Веб-обёртка над Keitaro Admin API: создание кампаний с двумя потоками и редактирование офферов (ТЗ v2.3).
 
-**Статус:** Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro, справочники/GEO, Campaign Creator (`POST /api/campaigns`) и локальная копия созданных кампаний работают; расчёт shares готов. Campaign Editor: чтение (`GET /api/campaigns`, `GET /api/campaigns/{id}`), выбор кампании Keitaro (`GET /api/keitaro/campaigns`, `POST /api/campaigns/fetch`), Fetch (`POST /api/campaigns/{id}/fetch`), локальные мутации офферов (Add/Delete/Restore/Fixed/PATCH) и Upload (`POST /api/flows/{flow_id}/upload`). Frontend (§7) реализован: две вкладки с реальными формами, таблицей офферов, уведомлениями и подтверждениями dangerous-действий. WRITE-проверки на живом трекере не выполнялись (Phase 0 только GET). Что сделано по пунктам ТЗ: раздел «Статус реализации» в самом ТЗ.
+**Статус:** Docker Compose, backend (FastAPI + Alembic + Postgres), Basic auth, клиент Keitaro, справочники/GEO, Campaign Creator (`POST /api/campaigns`) и локальная копия созданных кампаний работают; расчёт shares готов. Campaign Editor: чтение (`GET /api/campaigns`, `GET /api/campaigns/{id}`), выбор кампании Keitaro (`GET /api/keitaro/campaigns`, кэш 30 с, `POST /api/campaigns/fetch`), Fetch (`POST /api/campaigns/{id}/fetch`), локальные мутации офферов (Add/Delete/Restore/Fixed/PATCH) и Upload (`POST /api/flows/{flow_id}/upload`). Frontend (§7) реализован: две вкладки с реальными формами, таблицей офферов, уведомлениями и подтверждениями dangerous-действий. Для проверки функционала через UI есть демо-режим (включён по умолчанию): он передаёт `allow_readonly=true` и снимает `FLOW_READONLY`; без флага backend остаётся строгим. WRITE-проверки на живом трекере ассистентом не выполнялись (Phase 0 только GET). Что сделано по пунктам ТЗ: раздел «Статус реализации» в самом ТЗ.
 
 ## Технологии
 
@@ -64,21 +64,27 @@ Backend при старте сам выполняет `alembic upgrade head`. Е
 
 | Что | Где | Что должно быть |
 |---|---|---|
-| Интерфейс | http://127.0.0.1:8080 | вкладка **Create Campaign**: GEO, offer автодополнение, домен/группа/источник, результат с tracking URL; вкладка **Edit Campaign**: выбор кампании Keitaro, потоки, таблица офферов, Add/Delete/Restore, Fixed, сумма shares от backend, Fetch/Upload, Deleted Offers |
+| Интерфейс | http://127.0.0.1:8080 | вкладка **Create Campaign**: GEO (12 строк сразу, остальные по поиску), offer автодополнение, домен/группа/источник, результат с tracking URL; вкладка **Edit Campaign**: демо-режим READ_ONLY (вкл по умолчанию), выбор кампании Keitaro, потоки, таблица офферов, Add/Delete/Restore, Fixed, сумма shares от backend, Fetch/Upload, Deleted Offers |
 | Живость | http://127.0.0.1:8080/healthz | `{"status":"ok","db":true,"keitaro_configured":true}` |
 | Проверка Keitaro | http://127.0.0.1:8000/api/keitaro/ping | `{"ok":true,"campaigns_returned":N}`; `N` = 1, если в трекере есть кампании (значит `limit` работает) |
 | Swagger | http://127.0.0.1:8000/docs | только при `APP_ENV=development`, в production закрыт |
 | Создание кампании | `POST http://127.0.0.1:8000/api/campaigns` с Basic auth и телом `{name, geo, offer_id, domain_id, group_id, source_id}` | кампания + 2 потока в Keitaro, локальная копия в Postgres, ответ с ID, alias и tracking URL |
-| Список кампаний Keitaro | `GET http://127.0.0.1:8000/api/keitaro/campaigns?search=test` | `{id,name,alias,state}` для выбора в Editor; поиск по названию/alias/ID, без `token` |
+| Список кампаний Keitaro | `GET http://127.0.0.1:8000/api/keitaro/campaigns?search=test` | `{id,name,alias,state}` для выбора в Editor; поиск по названию/alias/ID, без `token`; ответ кэшируется на 30 с, `?refresh=true` обновляет кэш, UI фильтрует загруженный список локально |
 | Выбрать кампанию в Editor | `POST http://127.0.0.1:8000/api/campaigns/fetch` с телом `{"keitaro_id": 216227}` | первый вызов создаёт локальную копию через Fetch; 409 `LOCAL_CHANGES` при локальных правках (нужен `force: true`) |
 | Список локальных кампаний | `GET http://127.0.0.1:8000/api/campaigns` | массив с id/keitaro_id/name/alias и агрегированным `status` |
 | Карточка кампании | `GET http://127.0.0.1:8000/api/campaigns/1` | потоки, офферы, `shares_sum` и `shares_valid` от backend, `readonly`, `last_error`, раздел `deleted_offers` |
 | Fetch из Keitaro | `POST http://127.0.0.1:8000/api/campaigns/1/fetch` (при локальных правках `?force=true`) | обновлённая карточка; 409 `BUSY`/`LOCAL_CHANGES` при конфликте |
-| Добавить оффер | `POST .../api/campaigns/1/flows/2/offers` с телом `{"offer_id": 40004}` | оффер из каталога или из Deleted Offers; shares пересчитаны, 409 `DUPLICATE_OFFER` для активного дубля |
-| Удалить / восстановить | `DELETE .../offers/40004` / `POST .../offers/40004/restore` | мягкое удаление и возврат из Deleted Offers; новый/восстановленный оффер получает средний вес |
-| Поменять share / Fixed | `PATCH .../offers/40004` с телом `{"share": 40}` или `{"is_fixed": true}` | ручной share автоматически включает Fixed (D1); `share` вместе с `is_fixed: false` → 422 `INVALID_REQUEST` |
-| Upload потока | `POST http://127.0.0.1:8000/api/flows/2/upload` с телом `{"force": false}` | PUT offers + контрольное чтение; 409 `REMOTE_CHANGED`/`BUSY`/`CAMPAIGN_ARCHIVED`, 422 `EMPTY_FLOW`/`INVALID_SHARES`/`FLOW_READONLY` |
+| Добавить оффер | `POST .../api/campaigns/1/flows/2/offers?allow_readonly=true` с телом `{"offer_id": 40004}` | оффер из каталога или из Deleted Offers; shares пересчитаны, 409 `DUPLICATE_OFFER` для активного дубля; флаг нужен только для READ_ONLY-потоков |
+| Удалить / восстановить | `DELETE .../offers/40004?allow_readonly=true` / `POST .../offers/40004/restore?allow_readonly=true` | мягкое удаление и возврат из Deleted Offers; новый/восстановленный оффер получает средний вес |
+| Поменять share / Fixed | `PATCH .../offers/40004?allow_readonly=true` с телом `{"share": 40}` или `{"is_fixed": true}` | ручной share автоматически включает Fixed (D1); `share` вместе с `is_fixed: false` → 422 `INVALID_REQUEST` |
+| Upload потока | `POST http://127.0.0.1:8000/api/flows/2/upload?allow_readonly=true` с телом `{"force": false}` | PUT offers + контрольное чтение; 409 `REMOTE_CHANGED`/`BUSY`/`CAMPAIGN_ARCHIVED`, 422 `EMPTY_FLOW`/`INVALID_SHARES`/`FLOW_READONLY` (без демо-флага) |
 | БД | `psql postgresql://adrobot:adrobot@127.0.0.1:5433/adrobot -c "select * from alembic_version"` | `0003` |
+
+### Демо-режим READ_ONLY
+
+Вкладка **Edit Campaign** содержит переключатель «Демо-режим: разрешить редактирование READ_ONLY-потоков», включённый по умолчанию. При активном переключателе UI добавляет `allow_readonly=true` ко всем мутациям офферов и к Upload, поэтому потоки со схемой не `landings` или с неактивными офферами можно редактировать и отправлять в Keitaro. Если снять флаг, backend снова возвращает `FLOW_READONLY` — исходное поведение §4.2 сохранено для API-клиентов без флага.
+
+Это именно демонстрационный проход для владельца задания: локальные правки и Upload в живой трекер выполняются только по вашему действию в UI. Ассистент такие WRITE-вызовы не делал; WRITE-пути покрыты только моками в тестах.
 
 Basic auth: если в `.env` заданы `APP_BASIC_AUTH_USER` и `APP_BASIC_AUTH_PASSWORD`, браузер спросит логин при первом обращении к `/api`. `/healthz` всегда открыт. Для первого запуска можно оставить пустыми (только при `APP_ENV=development`).
 
@@ -147,7 +153,7 @@ docker compose build frontend
 # внутри образа выполняется: npm ci && npm run build (tsc --noEmit && vite build)
 ```
 
-Тесты используют отдельную PostgreSQL-БД `<DATABASE_URL>_test` (по умолчанию `adrobot_test`, можно переопределить `TEST_DATABASE_URL`); SQLite не используется. Keitaro мокается (`respx`), реальный ключ не нужен; WRITE-вызовы в живой трекер тестами не выполняются. Покрыто: клиент Keitaro (нормализация ошибок, повторы только для GET), Basic auth и fail-closed старт, discovery-скрипт, модели/миграции, справочники и GEO, расчёт shares, Campaign Creator (успех, дубли alias/name, таймаут и поиск по alias, архивация при частичной ошибке, отказ архивировать при ошибке чтения/БД, варианты tracking URL), Editor Fetch (чтение и агрегированный статус, force/BUSY, ошибки API, контроль revision, архивные офферы и потоки), Editor Offers (пересчёт shares, дубли, restore, Fixed и D1, read-only потоки, ошибки Fixed, блокировки), Editor Upload (partial/full PUT, REMOTE_CHANGED и force, ARCHIVED/BUSY/EMPTY_FLOW/INVALID_SHARES, контрольное чтение, error-log, зависшие uploading), Editor Selection (список кампаний Keitaro и первый Fetch). Полный прогон: **145 passed**.
+Тесты используют отдельную PostgreSQL-БД `<DATABASE_URL>_test` (по умолчанию `adrobot_test`, можно переопределить `TEST_DATABASE_URL`); SQLite не используется. Keitaro мокается (`respx`), реальный ключ не нужен; WRITE-вызовы в живой трекер тестами не выполняются. Покрыто: клиент Keitaro (нормализация ошибок, повторы только для GET), Basic auth и fail-closed старт, discovery-скрипт, модели/миграции, справочники и GEO, расчёт shares, Campaign Creator (успех, дубли alias/name, таймаут и поиск по alias, архивация при частичной ошибке, отказ архивировать при ошибке чтения/БД, варианты tracking URL), Editor Fetch (чтение и агрегированный статус, force/BUSY, ошибки API, контроль revision, архивные офферы и потоки), Editor Offers (пересчёт shares, дубли, restore, Fixed и D1, read-only потоки, демо-флаг `allow_readonly`, ошибки Fixed, блокировки), Editor Upload (partial/full PUT, REMOTE_CHANGED и force, ARCHIVED/BUSY/EMPTY_FLOW/INVALID_SHARES, контрольное чтение, error-log, зависшие uploading, демо-флаг для READ_ONLY), Editor Selection (список кампаний Keitaro и первый Fetch, кэш списка 30 с). Полный прогон: **147 passed**. Frontend: `docker compose build frontend` проходит (`tsc --noEmit && vite build`); в браузере проверены демо-переключатель, активные элементы READ_ONLY-потока, 12 вместо 249 GEO-чекбоксов, отсутствие запроса `/offers` на пустом поиске и cache hit списка кампаний (~25 мс), console errors = 0.
 
 ## Phase 0: сверка с вашим Keitaro
 
