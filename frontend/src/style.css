@@ -169,6 +169,7 @@ th { color: #57606a; font-weight: 600; background: #f8f9fa; }
   z-index: 40;
 }
 .modal { width: 380px; margin: 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 @media (max-width: 900px) {
   .grid-two { grid-template-columns: 1fr; }

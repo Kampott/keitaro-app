@@ -58,11 +58,18 @@ def _finish(
     *,
     new_ids: set[int] | None = None,
     pivot_ids: set[int] | None = None,
+    reset_free: bool = False,
 ) -> CampaignDetail:
     """Пересчитать shares, сдвинуть revision/статус, закоммитить и вернуть карточку."""
     new_ids, pivot_ids = new_ids or set(), pivot_ids or set()
     try:
         active = [o for o in _offers(session, flow.id) if o.is_active]
+        if reset_free:
+            # После удаления или снятия Fixed старые веса больше не отражают
+            # намерение пользователя: свободные доли делятся заново поровну.
+            for offer in active:
+                if not offer.is_fixed:
+                    offer.share = 0
         shares = calculate_shares([
             OfferInput(
                 id=o.id,
@@ -172,7 +179,7 @@ def delete_offer(
         row = _active_offer(session, flow.id, offer_id)
         row.is_active = False
         row.deleted_at = _now()
-        return _finish(session, flow, campaign_id)
+        return _finish(session, flow, campaign_id, reset_free=True)
     except Exception:
         session.rollback()
         raise
@@ -229,6 +236,7 @@ def patch_offer(
         flow = _lock_flow(session, campaign_id, flow_id)
         row = _active_offer(session, flow.id, offer_id)
         pivot_ids: set[int] = set()
+        reset_free = False
         if share is not None:
             row.share = share
             row.is_fixed = True
@@ -236,14 +244,8 @@ def patch_offer(
         else:
             was_fixed = bool(row.is_fixed)
             row.is_fixed = bool(is_fixed)
-            if was_fixed and not row.is_fixed:
-                # Снятие Fixed возвращает оффер в автораспределение. Обнуляем
-                # веса всех незакреплённых офферов, чтобы calculate_shares
-                # поделил остаток поровну, а не сохранил старый дисбаланс.
-                for other in _offers(session, flow.id):
-                    if other.is_active and not other.is_fixed:
-                        other.share = 0
-        return _finish(session, flow, campaign_id, pivot_ids=pivot_ids)
+            reset_free = was_fixed and not row.is_fixed
+        return _finish(session, flow, campaign_id, pivot_ids=pivot_ids, reset_free=reset_free)
     except Exception:
         session.rollback()
         raise

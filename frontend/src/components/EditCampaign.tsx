@@ -6,6 +6,12 @@ import type {
 
 type Props = { notify: Notify };
 type OfferOption = { id: number; label: string; hint?: string };
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: "danger" | "primary";
+};
 
 const STATUS_TEXT: Record<string, string> = {
   synced: "Синхронизировано",
@@ -46,6 +52,22 @@ export default function EditCampaign({ notify }: Props) {
   const offerPickerRef = useRef<HTMLDivElement>(null);
   const [draftShares, setDraftShares] = useState<Record<number, string>>({});
   const [forceUpload, setForceUpload] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const confirmResolver = useRef<((ok: boolean) => void) | null>(null);
+
+  function askConfirm(request: ConfirmRequest): Promise<boolean> {
+    return new Promise((resolve) => {
+      confirmResolver.current = resolve;
+      setConfirmRequest(request);
+    });
+  }
+
+  function closeConfirm(ok: boolean) {
+    const resolve = confirmResolver.current;
+    confirmResolver.current = null;
+    setConfirmRequest(null);
+    resolve?.(ok);
+  }
 
   function begin(label: string): boolean {
     if (busyRef.current) return false;
@@ -179,9 +201,13 @@ export default function EditCampaign({ notify }: Props) {
       });
     } catch (error) {
       if (error instanceof ApiError && error.code === "LOCAL_CHANGES" && !force) {
-        if (window.confirm("Есть локальные изменения. Fetch перезапишет их. Продолжить?")) {
-          return fetchKeitaro(keitaroId, true);
-        }
+        const confirmed = await askConfirm({
+          title: "Перезаписать локальные изменения?",
+          message: "Есть локальные изменения. Fetch перезапишет их. Продолжить?",
+          confirmLabel: "Продолжить",
+          tone: "primary",
+        });
+        if (confirmed) return fetchKeitaro(keitaroId, true);
       }
       throw error;
     }
@@ -276,7 +302,13 @@ export default function EditCampaign({ notify }: Props) {
 
   async function deleteOffer(offer: OfferDetail) {
     if (!campaign || !flow) return;
-    if (!window.confirm(`Удалить оффер ${offer.keitaro_offer_id} из потока? Он перейдёт в Deleted Offers.`)) return;
+    const confirmed = await askConfirm({
+      title: "Удалить оффер?",
+      message: `Оффер #${offer.keitaro_offer_id} будет перемещён в Deleted Offers. Доли остальных офферов будут пересчитаны.`,
+      confirmLabel: "Удалить",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers/${offer.keitaro_offer_id}`,
       "DELETE",
@@ -313,9 +345,17 @@ export default function EditCampaign({ notify }: Props) {
 
   async function upload(force = forceUpload) {
     if (!flow || !begin("upload")) return;
-    if (force && !window.confirm("Force upload перезапишет офферы потока в Keitaro. Продолжить?")) {
-      end();
-      return;
+    if (force) {
+      const confirmed = await askConfirm({
+        title: "Force upload",
+        message: "Force upload перезапишет офферы потока в Keitaro. Продолжить?",
+        confirmLabel: "Перезаписать",
+        tone: "danger",
+      });
+      if (!confirmed) {
+        end();
+        return;
+      }
     }
     try {
       const path = `/api/flows/${flow.id}/upload`;
@@ -327,8 +367,15 @@ export default function EditCampaign({ notify }: Props) {
       try {
         detail = await send(force);
       } catch (error) {
-        if (error instanceof ApiError && error.code === "REMOTE_CHANGED" && !force &&
-            window.confirm("Поток изменился в Keitaro. Перезаписать его локальной версией (force upload)?")) {
+        const confirmed = error instanceof ApiError && error.code === "REMOTE_CHANGED" && !force
+          ? await askConfirm({
+            title: "Поток изменился в Keitaro",
+            message: "Перезаписать его локальной версией (force upload)?",
+            confirmLabel: "Перезаписать",
+            tone: "danger",
+          })
+          : false;
+        if (confirmed) {
           detail = await send(true);
         } else {
           throw error;
@@ -704,6 +751,39 @@ export default function EditCampaign({ notify }: Props) {
 
       {campaign && !flows.length && (
         <section className="card"><p className="muted">В кампании нет потоков.</p></section>
+      )}
+
+      {confirmRequest && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeConfirm(false);
+          }}
+        >
+          <div
+            className="modal card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            aria-describedby="confirm-message"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeConfirm(false);
+            }}
+          >
+            <h2 id="confirm-title">{confirmRequest.title}</h2>
+            <p id="confirm-message" className="muted">{confirmRequest.message}</p>
+            <div className="modal-actions">
+              <button type="button" autoFocus onClick={() => closeConfirm(false)}>Отмена</button>
+              <button
+                type="button"
+                className={confirmRequest.tone === "danger" ? "danger" : "primary"}
+                onClick={() => closeConfirm(true)}
+              >
+                {confirmRequest.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

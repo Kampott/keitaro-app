@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.api.deps import get_db
 from app.db import models
 from app.main import app
+import app.services.share_calculator as sc
 
 AUTH = ("u", "p")
 BASE = "https://k.example/admin_api/v1"
@@ -193,6 +194,35 @@ def test_delete_then_restore(client, session):
     assert shares(flow) == {18813: 50, 20001: 50}
     assert [o["keitaro_offer_id"] for o in flow["deleted_offers"]] == [30003]
     assert flow["revision"] == 5
+
+
+@pytest.mark.parametrize("min_share", [0, 1])
+def test_delete_equalizes_remaining_free_offers(client, session, monkeypatch, min_share):
+    monkeypatch.setattr(sc, "MIN_SHARE", min_share)
+    c, f = make_campaign(session, offers=[
+        dict(koi=18813, name="A", share=34, fixed=False, active=True),
+        dict(koi=20001, name="B", share=33, fixed=False, active=True),
+        dict(koi=40004, name="C", share=33, fixed=False, active=True),
+    ])
+    r = client.delete(f"/api/campaigns/{c.id}/flows/{f.id}/offers/40004", auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    assert shares(flow_of(r.json())) == {18813: 50, 20001: 50}
+    assert flow_of(r.json())["shares_valid"] is True
+
+
+def test_delete_keeps_fixed_share_and_equalizes_free_offers(client, session):
+    c, f = make_campaign(session, offers=[
+        dict(koi=18813, name="A", share=40, fixed=True, active=True),
+        dict(koi=20001, name="B", share=30, fixed=False, active=True),
+        dict(koi=40004, name="C", share=30, fixed=False, active=True),
+    ])
+    r = client.delete(f"/api/campaigns/{c.id}/flows/{f.id}/offers/40004", auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    flow = flow_of(r.json())
+    assert shares(flow) == {18813: 40, 20001: 60}
+    assert offer_of(flow, 18813)["is_fixed"] is True
 
 
 def test_delete_last_active_offer_is_allowed_locally(client, session):
