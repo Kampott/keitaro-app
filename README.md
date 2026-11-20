@@ -58,6 +58,7 @@ Backend при старте сам выполняет `alembic upgrade head`. П
 | Статус контейнеров | `docker compose ps` |
 | Тесты backend | `docker compose run --rm --build backend python -m pytest -q` |
 | Сборка frontend | `docker compose build frontend` |
+| Применить миграции | `docker compose exec backend alembic upgrade head` |
 | Текущая миграция | `docker compose exec backend alembic current` |
 | Подключение к БД | `docker compose exec db psql -U adrobot -d adrobot` |
 

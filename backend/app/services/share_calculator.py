@@ -122,7 +122,9 @@ def calculate_shares(
         else Share(o.id, o.share)
         for o in offers
     ]
-    assert sum(s.share for s in result) == TOTAL
+    total = sum(s.share for s in result)
+    if total != TOTAL:
+        raise _err("INVALID_SHARES", "Расчёт дал сумму shares, отличную от 100", total=total)
     return result
 
 
