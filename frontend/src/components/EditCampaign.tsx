@@ -114,7 +114,12 @@ export default function EditCampaign({ notify }: Props) {
 
   function applyDetail(detail: CampaignDetail) {
     setCampaign(detail);
-    setFlowId(detail.flows[0]?.id ?? null);
+    // После мутации/Fetch остаёмся на том же потоке, если он ещё существует.
+    setFlowId((current) =>
+      detail.flows.some((item) => item.id === current)
+        ? current
+        : detail.flows[0]?.id ?? null,
+    );
     setDraftShares({});
   }
 
