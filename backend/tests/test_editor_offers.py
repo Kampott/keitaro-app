@@ -235,19 +235,24 @@ def test_invalid_patch(client, session, body):
 
 
 def test_fixed_toggle_recalculates(client, session):
-    c, f = make_campaign(session)
+    c, f = make_campaign(session, offers=[
+        dict(koi=18813, name="A", share=60, fixed=False, active=True),
+        dict(koi=20001, name="B", share=30, fixed=False, active=True),
+        dict(koi=40004, name="C", share=10, fixed=False, active=True),
+    ])
     url = f"/api/campaigns/{c.id}/flows/{f.id}/offers/18813"
 
     on = client.patch(url, json={"is_fixed": True}, auth=AUTH)
     assert on.status_code == 200, on.text
     flow = flow_of(on.json())
-    assert shares(flow) == {18813: 60, 20001: 40}
+    assert shares(flow) == {18813: 60, 20001: 30, 40004: 10}
     assert offer_of(flow, 18813)["is_fixed"] is True
 
     off = client.patch(url, json={"is_fixed": False}, auth=AUTH)
     assert off.status_code == 200, off.text
     flow = flow_of(off.json())
-    assert shares(flow) == {18813: 60, 20001: 40}
+    # Снятие Fixed выравнивает все свободные доли; 1% остатка идёт первому.
+    assert shares(flow) == {18813: 34, 20001: 33, 40004: 33}
     assert all(not o["is_fixed"] for o in flow["offers"])
     assert flow["revision"] == 5
 

@@ -76,7 +76,7 @@ Backend при старте сам выполняет `alembic upgrade head`. Е
 | Fetch из Keitaro | `POST http://127.0.0.1:8000/api/campaigns/1/fetch` (при локальных правках `?force=true`) | обновлённая карточка; 409 `BUSY`/`LOCAL_CHANGES` при конфликте |
 | Добавить оффер | `POST .../api/campaigns/1/flows/2/offers` с телом `{"offer_id": 40004}` | оффер из каталога, из Deleted Offers или произвольный ID (название тогда недоступно); shares пересчитаны, 409 `DUPLICATE_OFFER` для активного дубля |
 | Удалить / восстановить | `DELETE .../offers/40004` / `POST .../offers/40004/restore` | мягкое удаление и возврат из Deleted Offers; новый/восстановленный оффер получает средний вес |
-| Поменять share / Fixed | `PATCH .../offers/40004` с телом `{"share": 40}` или `{"is_fixed": true}` | ручной share автоматически включает Fixed (D1); `share` вместе с `is_fixed: false` → 422 `INVALID_REQUEST` |
+| Поменять share / Fixed | `PATCH .../offers/40004` с телом `{"share": 40}` или `{"is_fixed": true}` | ручной share автоматически включает Fixed (D1); снятие Fixed выравнивает доли всех незакреплённых офферов (неровный остаток детерминированно: 34/33/33 для трёх); `share` вместе с `is_fixed: false` → 422 `INVALID_REQUEST` |
 | Upload потока | `POST http://127.0.0.1:8000/api/flows/2/upload` с телом `{"force": false}` | PUT offers + контрольное чтение; 409 `REMOTE_CHANGED`/`BUSY`/`CAMPAIGN_ARCHIVED`, 422 `EMPTY_FLOW`/`INVALID_SHARES` |
 | БД | `psql postgresql://adrobot:adrobot@127.0.0.1:5433/adrobot -c "select * from alembic_version"` | `0003` |
 

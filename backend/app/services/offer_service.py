@@ -234,7 +234,15 @@ def patch_offer(
             row.is_fixed = True
             pivot_ids.add(row.id)
         else:
+            was_fixed = bool(row.is_fixed)
             row.is_fixed = bool(is_fixed)
+            if was_fixed and not row.is_fixed:
+                # Снятие Fixed возвращает оффер в автораспределение. Обнуляем
+                # веса всех незакреплённых офферов, чтобы calculate_shares
+                # поделил остаток поровну, а не сохранил старый дисбаланс.
+                for other in _offers(session, flow.id):
+                    if other.is_active and not other.is_fixed:
+                        other.share = 0
         return _finish(session, flow, campaign_id, pivot_ids=pivot_ids)
     except Exception:
         session.rollback()
