@@ -4,17 +4,26 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.api import keitaro
+from app.api import campaigns, flows, geo, keitaro
 from app.api.deps import require_auth
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.database import get_engine
+from app.services import upload_service
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     get_settings()  # fail-closed: без настроенной авторизации production не стартует
+    # §4.9 п.6: зависшие uploading после перезапуска переводим в error. Best-effort:
+    # недоступность БД не должна мешать старту (в тестах БД намеренно недоступна).
+    try:
+        with Session(get_engine()) as session:
+            upload_service.recover_stale_uploads(session)
+    except Exception:
+        pass
     yield
 
 
@@ -49,5 +58,8 @@ def healthz():
 
 
 api = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
+api.include_router(geo.router)
 api.include_router(keitaro.router)
+api.include_router(campaigns.router)
+api.include_router(flows.router)
 app.include_router(api)

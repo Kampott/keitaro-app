@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
-from app.api.deps import get_keitaro
+from app.api.deps import get_catalog, get_keitaro
 from app.core.config import get_settings
 from app.db import models  # noqa: F401 — регистрация моделей в Base.metadata
 from app.db.database import Base, get_engine
@@ -31,7 +31,7 @@ _load_env_file()
 
 
 def _reset():
-    for f in (get_settings, get_keitaro, get_engine):
+    for f in (get_settings, get_keitaro, get_catalog, get_engine):
         f.cache_clear()
 
 
@@ -42,6 +42,10 @@ def env(monkeypatch):
     monkeypatch.setenv("APP_BASIC_AUTH_PASSWORD", "p")
     monkeypatch.setenv("KEITARO_BASE_URL", "https://k.example/")
     monkeypatch.setenv("KEITARO_API_KEY", "KEY123")
+    monkeypatch.setenv("KEITARO_DEFAULT_DOMAIN_ID", "1813")
+    monkeypatch.setenv("KEITARO_DEFAULT_GROUP_ID", "10489")
+    monkeypatch.setenv("KEITARO_DEFAULT_TRAFFIC_SOURCE_ID", "836")
+    monkeypatch.setenv("GOOGLE_REDIRECT_URL", "https://google.com")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x:x@127.0.0.1:1/x")  # заведомо недоступна
     _reset()
     yield

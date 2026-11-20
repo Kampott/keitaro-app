@@ -3,6 +3,17 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 
+def _optional_id(value: str) -> int | None:
+    """Пустое значение = None (переменная необязательна). Нечисло = ошибка конфигурации."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise RuntimeError(f"Ожидался целочисленный ID, получено: {value!r}") from None
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str
@@ -11,6 +22,10 @@ class Settings:
     keitaro_api_key: str
     basic_user: str
     basic_password: str
+    keitaro_default_domain_id: int | None
+    keitaro_default_group_id: int | None
+    keitaro_default_traffic_source_id: int | None
+    google_redirect_url: str
 
 
 @lru_cache
@@ -23,6 +38,10 @@ def get_settings() -> Settings:
         keitaro_api_key=e("KEITARO_API_KEY", "").strip(),
         basic_user=e("APP_BASIC_AUTH_USER", ""),
         basic_password=e("APP_BASIC_AUTH_PASSWORD", ""),
+        keitaro_default_domain_id=_optional_id(e("KEITARO_DEFAULT_DOMAIN_ID", "")),
+        keitaro_default_group_id=_optional_id(e("KEITARO_DEFAULT_GROUP_ID", "")),
+        keitaro_default_traffic_source_id=_optional_id(e("KEITARO_DEFAULT_TRAFFIC_SOURCE_ID", "")),
+        google_redirect_url=e("GOOGLE_REDIRECT_URL", "https://google.com").strip() or "https://google.com",
     )
     if not s.database_url:
         raise RuntimeError("DATABASE_URL не задан")

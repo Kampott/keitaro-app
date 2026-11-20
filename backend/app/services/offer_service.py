@@ -1,0 +1,245 @@
+"""Локальные мутации офферов потока (ТЗ §4.4–§4.7)."""
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.errors import AppError
+from app.db import models
+from app.schemas.editor import CampaignDetail
+from app.services import editor_service
+from app.services.catalog_service import CatalogService
+from app.services.keitaro_client import KeitaroClient
+from app.services.share_calculator import OfferInput, calculate_shares
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _flow_or_404(session: Session, campaign_id: int, flow_id: int) -> models.CampaignFlow:
+    flow = session.scalar(
+        select(models.CampaignFlow).where(
+            models.CampaignFlow.id == flow_id,
+            models.CampaignFlow.campaign_id == campaign_id,
+        )
+    )
+    if flow is None:
+        raise AppError("NOT_FOUND", f"Поток {flow_id} не найден в кампании {campaign_id}", 404)
+    return flow
+
+
+def _lock_flow(session: Session, campaign_id: int, flow_id: int) -> models.CampaignFlow:
+    flow = session.scalar(
+        select(models.CampaignFlow)
+        .where(
+            models.CampaignFlow.id == flow_id,
+            models.CampaignFlow.campaign_id == campaign_id,
+        )
+        .with_for_update()
+    )
+    if flow is None:
+        raise AppError("NOT_FOUND", f"Поток {flow_id} не найден в кампании {campaign_id}", 404)
+    return flow
+
+
+def _assert_editable(session: Session, flow: models.CampaignFlow) -> None:
+    # Поток редактируется только со схемой landings и без офферов в неактивном
+    # состоянии Keitaro (§4.2). Проверяем и архивные строки тоже; запрос в БД,
+    # а не связь flow.offers, чтобы не полагаться на кэш сессии.
+    if flow.schema != "landings" or any(
+        o.keitaro_state != "active" for o in _offers(session, flow.id)
+    ):
+        raise AppError(
+            "FLOW_READONLY", "Поток доступен только для чтения", 422,
+            details={"flow_id": flow.id, "schema": flow.schema},
+        )
+
+
+def _offers(session: Session, flow_id: int) -> list[models.CampaignOffer]:
+    return list(session.scalars(
+        select(models.CampaignOffer)
+        .where(models.CampaignOffer.flow_id == flow_id)
+        .order_by(models.CampaignOffer.created_at, models.CampaignOffer.id)
+    ).all())
+
+
+def _finish(
+    session: Session,
+    flow: models.CampaignFlow,
+    campaign_id: int,
+    *,
+    new_ids: set[int] | None = None,
+    pivot_ids: set[int] | None = None,
+) -> CampaignDetail:
+    """Пересчитать shares, сдвинуть revision/статус, закоммитить и вернуть карточку."""
+    new_ids, pivot_ids = new_ids or set(), pivot_ids or set()
+    try:
+        active = [o for o in _offers(session, flow.id) if o.is_active]
+        shares = calculate_shares([
+            OfferInput(
+                id=o.id,
+                share=o.share,
+                is_fixed=bool(o.is_fixed),
+                is_new=o.id in new_ids,
+                is_pivot=o.id in pivot_ids,
+            )
+            for o in active
+        ])
+        by_id = {s.id: s.share for s in shares}
+        for offer in active:
+            offer.share = by_id[offer.id]
+        flow.revision = (flow.revision or 0) + 1
+        if flow.sync_status != "uploading":
+            flow.sync_status = "modified"
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return editor_service.get_campaign(session, campaign_id)
+
+
+def _active_offer(session: Session, flow_id: int, offer_id: int) -> models.CampaignOffer:
+    row = session.scalar(
+        select(models.CampaignOffer).where(
+            models.CampaignOffer.flow_id == flow_id,
+            models.CampaignOffer.keitaro_offer_id == offer_id,
+            models.CampaignOffer.is_active.is_(True),
+        )
+    )
+    if row is None:
+        raise AppError(
+            "NOT_FOUND", f"Активный оффер {offer_id} не найден в потоке {flow_id}", 404
+        )
+    return row
+
+
+def add_offer(
+    client: KeitaroClient,
+    catalog: CatalogService,
+    session: Session,
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+) -> CampaignDetail:
+    """§4.4: добавить оффер или восстановить его из Deleted Offers."""
+    _assert_editable(session, _flow_or_404(session, campaign_id, flow_id))
+
+    found = catalog.get_offer(offer_id)  # сетевой вызов до захвата блокировки
+    if found is None:
+        raise AppError("KEITARO_NOT_FOUND", f"Оффер {offer_id} не найден в Keitaro", 404)
+
+    try:
+        flow = _lock_flow(session, campaign_id, flow_id)
+        _assert_editable(session, flow)
+        row = session.scalar(
+            select(models.CampaignOffer).where(
+                models.CampaignOffer.flow_id == flow.id,
+                models.CampaignOffer.keitaro_offer_id == offer_id,
+            )
+        )
+        if row is not None and row.is_active:
+            raise AppError(
+                "DUPLICATE_OFFER", f"Оффер {offer_id} уже есть в потоке", 409,
+                details={"flow_id": flow.id, "offer_id": offer_id},
+            )
+        if row is None:
+            row = models.CampaignOffer(
+                flow_id=flow.id,
+                keitaro_offer_id=offer_id,
+                offer_name=found.name,
+                share=0,
+                is_fixed=False,
+                is_active=True,
+            )
+            session.add(row)
+        else:
+            # §4.4: добавление из архива = restore: прежний share не используется.
+            row.is_active = True
+            row.deleted_at = None
+            row.is_fixed = False
+            row.share = 0
+            row.offer_name = found.name
+        session.flush()
+        return _finish(session, flow, campaign_id, new_ids={row.id})
+    except Exception:
+        session.rollback()
+        raise
+
+
+def delete_offer(
+    session: Session, campaign_id: int, flow_id: int, offer_id: int
+) -> CampaignDetail:
+    """§4.5: мягкое удаление; последний share сохраняется в архивной строке."""
+    try:
+        flow = _lock_flow(session, campaign_id, flow_id)
+        _assert_editable(session, flow)
+        row = _active_offer(session, flow.id, offer_id)
+        row.is_active = False
+        row.deleted_at = _now()
+        return _finish(session, flow, campaign_id)
+    except Exception:
+        session.rollback()
+        raise
+
+
+def restore_offer(
+    session: Session, campaign_id: int, flow_id: int, offer_id: int
+) -> CampaignDetail:
+    """§4.5: restore — новый оффер со средним весом, Fixed снят."""
+    try:
+        flow = _lock_flow(session, campaign_id, flow_id)
+        _assert_editable(session, flow)
+        row = session.scalar(
+            select(models.CampaignOffer).where(
+                models.CampaignOffer.flow_id == flow.id,
+                models.CampaignOffer.keitaro_offer_id == offer_id,
+                models.CampaignOffer.is_active.is_(False),
+            )
+        )
+        if row is None:
+            raise AppError(
+                "NOT_FOUND", f"Оффер {offer_id} не найден в Deleted Offers потока {flow_id}", 404
+            )
+        row.is_active = True
+        row.deleted_at = None
+        row.is_fixed = False
+        row.share = 0  # §4.5: прежний share в расчёте не участвует
+        session.flush()
+        return _finish(session, flow, campaign_id, new_ids={row.id})
+    except Exception:
+        session.rollback()
+        raise
+
+
+def patch_offer(
+    session: Session,
+    campaign_id: int,
+    flow_id: int,
+    offer_id: int,
+    *,
+    share: int | None = None,
+    is_fixed: bool | None = None,
+) -> CampaignDetail:
+    """§4.6: ручной ввод share делает оффер закреплённым (D1)."""
+    if share is None and is_fixed is None:
+        raise AppError("INVALID_REQUEST", "Пустой PATCH", 422)
+    if share is not None and is_fixed is False:
+        raise AppError(
+            "INVALID_REQUEST", "Чтобы ввести share, сначала снимите Fixed отдельным запросом", 422
+        )
+    try:
+        flow = _lock_flow(session, campaign_id, flow_id)
+        _assert_editable(session, flow)
+        row = _active_offer(session, flow.id, offer_id)
+        pivot_ids: set[int] = set()
+        if share is not None:
+            row.share = share
+            row.is_fixed = True
+            pivot_ids.add(row.id)
+        else:
+            row.is_fixed = bool(is_fixed)
+        return _finish(session, flow, campaign_id, pivot_ids=pivot_ids)
+    except Exception:
+        session.rollback()
+        raise
