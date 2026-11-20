@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, describeError, query, withDemo } from "../api";
+import { api, ApiError, describeError, query } from "../api";
 import type {
   CampaignDetail, CampaignSummary, FlowDetail, KeitaroCampaign, Notify, OfferDetail, OfferItem,
 } from "../types";
@@ -13,12 +13,6 @@ const STATUS_TEXT: Record<string, string> = {
   error: "Ошибка",
 };
 
-function readonlyReason(flow: FlowDetail): string {
-  if (flow.schema !== "landings") return `schema = ${flow.schema}`;
-  const inactive = [...flow.offers, ...flow.deleted_offers].find((offer) => offer.keitaro_state !== "active");
-  return inactive ? `оффер ${inactive.keitaro_offer_id}: state = ${inactive.keitaro_state}` : "";
-}
-
 export default function EditCampaign({ notify }: Props) {
   const [remoteCampaigns, setRemoteCampaigns] = useState<KeitaroCampaign[]>([]);
   const [campaignLoading, setCampaignLoading] = useState(true);
@@ -30,10 +24,10 @@ export default function EditCampaign({ notify }: Props) {
   const busyRef = useRef(false);
   const [offerSearch, setOfferSearch] = useState("");
   const [offerResults, setOfferResults] = useState<OfferItem[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [customOfferId, setCustomOfferId] = useState("");
   const [draftShares, setDraftShares] = useState<Record<number, string>>({});
   const [forceUpload, setForceUpload] = useState(false);
-  // Демо-режим включён по умолчанию: владелец задания хочет попробовать мутации через UI.
-  const [demoEdit, setDemoEdit] = useState(true);
 
   function begin(label: string): boolean {
     if (busyRef.current) return false;
@@ -78,7 +72,6 @@ export default function EditCampaign({ notify }: Props) {
 
   const flows = campaign?.flows ?? [];
   const flow = flows.find((item) => item.id === flowId) ?? flows[0] ?? null;
-  const blocked = !!flow && flow.readonly && !demoEdit;
   const searchText = campaignSearch.trim().toLowerCase();
   const visibleCampaigns = remoteCampaigns.filter((item) =>
     !searchText
@@ -86,15 +79,17 @@ export default function EditCampaign({ notify }: Props) {
     || item.alias.toLowerCase().includes(searchText)
     || String(item.id).includes(searchText));
 
-  // Пустой запрос не дёргает Keitaro и не показывает "все подряд" в автодополнении.
+  //Autocomplete показывает каталог сразу (в том числе на пустом поиске),
+  //поэтому список появляется при фокусе, а не только после двух символов.
   useEffect(() => {
-    const term = offerSearch.trim();
-    if (!flow || blocked || (!/^\d+$/.test(term) && term.length < 2)) {
+    if (!flow) {
       setOfferResults([]);
       return;
     }
+    const term = offerSearch.trim();
     let cancelled = false;
     const controller = new AbortController();
+    setOffersLoading(true);
     const timer = window.setTimeout(async () => {
       try {
         const rows = await api<OfferItem[]>(
@@ -106,22 +101,20 @@ export default function EditCampaign({ notify }: Props) {
         if (!cancelled && !(error instanceof ApiError && error.code === "NETWORK" && controller.signal.aborted)) {
           notify("error", `Каталог офферов недоступен: ${describeError(error)}`);
         }
+      } finally {
+        if (!cancelled) setOffersLoading(false);
       }
-    }, 250);
+    }, 150);
     return () => {
       cancelled = true;
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [offerSearch, flow?.id, blocked, notify]);
+  }, [offerSearch, flow?.id, notify]);
 
   function applyDetail(detail: CampaignDetail) {
     setCampaign(detail);
-    setFlowId((current) => {
-      if (detail.flows.some((item) => item.id === current)) return current;
-      if (demoEdit) return detail.flows[0]?.id ?? null;
-      return (detail.flows.find((item) => !item.readonly)?.id ?? detail.flows[0]?.id ?? null);
-    });
+    setFlowId(detail.flows[0]?.id ?? null);
     setDraftShares({});
   }
 
@@ -172,25 +165,27 @@ export default function EditCampaign({ notify }: Props) {
     }
   }
 
-  async function mutate(path: string, method: string, body?: unknown, success?: string) {
-    if (!begin("offer")) return;
+  async function mutate(path: string, method: string, body?: unknown, success?: string): Promise<boolean> {
+    if (!begin("offer")) return false;
     try {
-      const detail = await api<CampaignDetail>(withDemo(path, demoEdit), {
+      const detail = await api<CampaignDetail>(path, {
         method,
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       applyDetail(detail);
       if (success) notify("success", success);
       await refreshLocal();
+      return true;
     } catch (error) {
       notify("error", describeError(error));
+      return false;
     } finally {
       end();
     }
   }
 
   async function commitShare(offer: OfferDetail) {
-    if (!campaign || !flow || blocked || isLocked(offer)) return;
+    if (!campaign || !flow) return;
     const raw = draftShares[offer.keitaro_offer_id];
     if (raw === undefined) return;
     if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 100) {
@@ -206,12 +201,8 @@ export default function EditCampaign({ notify }: Props) {
     );
   }
 
-  function isLocked(offer: OfferDetail): boolean {
-    return offer.readonly && !demoEdit;
-  }
-
   async function toggleFixed(offer: OfferDetail, isFixed: boolean) {
-    if (!campaign || !flow || blocked) return;
+    if (!campaign || !flow) return;
     await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers/${offer.keitaro_offer_id}`,
       "PATCH",
@@ -221,7 +212,7 @@ export default function EditCampaign({ notify }: Props) {
   }
 
   async function deleteOffer(offer: OfferDetail) {
-    if (!campaign || !flow || blocked) return;
+    if (!campaign || !flow) return;
     if (!window.confirm(`Удалить оффер ${offer.keitaro_offer_id} из потока? Он перейдёт в Deleted Offers.`)) return;
     await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers/${offer.keitaro_offer_id}`,
@@ -232,7 +223,7 @@ export default function EditCampaign({ notify }: Props) {
   }
 
   async function restoreOffer(offer: OfferDetail) {
-    if (!campaign || !flow || blocked) return;
+    if (!campaign || !flow) return;
     await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers/${offer.keitaro_offer_id}/restore`,
       "POST",
@@ -241,27 +232,39 @@ export default function EditCampaign({ notify }: Props) {
     );
   }
 
-  async function addOffer(offer: OfferItem) {
-    if (!campaign || !flow || blocked) return;
-    await mutate(
+  async function addOffer(offerId: number) {
+    if (!campaign || !flow) return;
+    const ok = await mutate(
       `/api/campaigns/${campaign.id}/flows/${flow.id}/offers`,
       "POST",
-      { offer_id: offer.id },
-      `Оффер ${offer.id} добавлен в поток`,
+      { offer_id: offerId },
+      `Оффер ${offerId} добавлен в поток`,
     );
-    setOfferSearch("");
-    setOfferResults([]);
+    if (ok) {
+      setOfferSearch("");
+      setOfferResults([]);
+      setCustomOfferId("");
+    }
+  }
+
+  async function addCustomOffer() {
+    const raw = customOfferId.trim();
+    if (!/^\d+$/.test(raw) || Number(raw) <= 0) {
+      notify("error", "Offer ID — положительное целое число");
+      return;
+    }
+    await addOffer(Number(raw));
   }
 
   async function upload(force = forceUpload) {
-    if (!flow || blocked || !begin("upload")) return;
+    if (!flow || !begin("upload")) return;
     if (force && !window.confirm("Force upload перезапишет офферы потока в Keitaro. Продолжить?")) {
       end();
       return;
     }
     try {
       const path = `/api/flows/${flow.id}/upload`;
-      const send = (withForce: boolean) => api<CampaignDetail>(withDemo(path, demoEdit), {
+      const send = (withForce: boolean) => api<CampaignDetail>(path, {
         method: "POST",
         body: JSON.stringify({ force: withForce }),
       });
@@ -300,14 +303,6 @@ export default function EditCampaign({ notify }: Props) {
           Выберите кампанию Keitaro. При первом выборе backend выполнит Fetch и создаст локальную копию.
           Изменения сначала сохраняются локально; в Keitaro уходят только по Upload.
         </p>
-        <label className="check-line demo-toggle">
-          <input
-            type="checkbox"
-            checked={demoEdit}
-            onChange={(event) => setDemoEdit(event.target.checked)}
-          />
-          Демо-режим: разрешить редактирование READ_ONLY-потоков
-        </label>
         <div className="inline">
           <input
             aria-label="Поиск кампании по названию, alias или ID"
@@ -380,52 +375,55 @@ export default function EditCampaign({ notify }: Props) {
                     <input
                       type="checkbox"
                       checked={forceUpload}
-                      disabled={busy !== null || blocked}
+                      disabled={busy !== null}
                       onChange={(event) => setForceUpload(event.target.checked)}
                     />
                     Force upload
                   </label>
-                  <button className="primary" disabled={busy !== null || blocked} onClick={() => upload()}>
+                  <button className="primary" disabled={busy !== null} onClick={() => upload()}>
                     {busy === "upload" ? "Upload…" : "Upload to Keitaro"}
                   </button>
                 </div>
               </div>
 
-              {blocked && (
-                <p className="warn">
-                  Поток доступен только для чтения: {readonlyReason(flow) || "причина не указана"}.
-                  Включите демо-режим выше, чтобы попробовать мутации.
-                </p>
-              )}
-              {demoEdit && flow.readonly && (
-                <p className="muted demo-note">
-                  Демо-режим включён: проверка READ_ONLY снята. Правки сохраняются локально,
-                  а Upload отправит их в Keitaro.
-                </p>
-              )}
               {flow.last_error && <p className="err">Последняя ошибка: {flow.last_error}</p>}
               {busy && <p className="muted">Операция: {busy}…</p>}
 
               <div className="table-head">
                 <h3>Offers</h3>
-                {!blocked && (
+                <div className="offer-add">
                   <div className="inline">
                     <input
                       aria-label="Найти оффер для добавления"
                       value={offerSearch}
                       onChange={(event) => setOfferSearch(event.target.value)}
-                      placeholder="Название или ID оффера (от 2 символов)"
+                      placeholder="Название или ID оффера"
                       disabled={busy !== null}
                     />
                     <div className="suggestions inline-suggestions">
-                      {offerResults.map((offer) => (
-                        <button key={offer.id} type="button" disabled={busy !== null} onClick={() => addOffer(offer)}>
+                      {offersLoading && <span className="muted">Загрузка…</span>}
+                      {!offersLoading && offerResults.map((offer) => (
+                        <button key={offer.id} type="button" disabled={busy !== null} onClick={() => addOffer(offer.id)}>
                           + #{offer.id} {offer.name}
                         </button>
                       ))}
+                      {!offersLoading && !offerResults.length && <span className="muted">Ничего не найдено</span>}
                     </div>
                   </div>
-                )}
+                  <div className="inline">
+                    <input
+                      aria-label="Произвольный Offer ID"
+                      value={customOfferId}
+                      onChange={(event) => setCustomOfferId(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === "Enter") void addCustomOffer(); }}
+                      placeholder="Произвольный Offer ID"
+                      disabled={busy !== null}
+                    />
+                    <button type="button" disabled={busy !== null || !customOfferId.trim()} onClick={addCustomOffer}>
+                      Добавить по ID
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="table-wrap">
@@ -455,7 +453,7 @@ export default function EditCampaign({ notify }: Props) {
                             title="Целое число от 1 до 100"
                             aria-label={`Share оффера ${offer.keitaro_offer_id}`}
                             value={draftShares[offer.keitaro_offer_id] ?? String(offer.share)}
-                            disabled={busy !== null || blocked || isLocked(offer)}
+                            disabled={busy !== null}
                             onChange={(event) => setDraftShares((current) => ({
                               ...current, [offer.keitaro_offer_id]: event.target.value,
                             }))}
@@ -473,7 +471,7 @@ export default function EditCampaign({ notify }: Props) {
                             type="checkbox"
                             aria-label={`Fixed оффера ${offer.keitaro_offer_id}`}
                             checked={offer.is_fixed}
-                            disabled={busy !== null || blocked || isLocked(offer)}
+                            disabled={busy !== null}
                             onChange={(event) => toggleFixed(offer, event.target.checked)}
                           />
                         </td>
@@ -482,7 +480,7 @@ export default function EditCampaign({ notify }: Props) {
                         <td>
                           <button
                             className="danger"
-                            disabled={busy !== null || blocked || isLocked(offer)}
+                            disabled={busy !== null}
                             onClick={() => deleteOffer(offer)}
                           >
                             Delete
@@ -511,7 +509,7 @@ export default function EditCampaign({ notify }: Props) {
                         <td>{offer.keitaro_state}</td>
                         <td>
                           <button
-                            disabled={busy !== null || blocked || isLocked(offer)}
+                            disabled={busy !== null}
                             onClick={() => restoreOffer(offer)}
                           >
                             Restore

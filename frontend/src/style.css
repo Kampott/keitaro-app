@@ -77,7 +77,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .err { color: #b42318; }
 .warn { color: #9a6700; background: #fff8e5; border-left: 3px solid #e3b341; padding: 8px 10px; }
 .muted { color: #6b7280; font-size: 13px; }
-.demo-note { background: #eaf2ff; border-left: 3px solid #1f6feb; padding: 8px 10px; border-radius: 4px; }
 .share-hint { margin: 4px 0 10px; }
 .geo-hint { margin: 4px 0 0; }
 code { background: #f0f2f5; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
@@ -88,7 +87,9 @@ th, td { text-align: left; border-bottom: 1px solid #e8eaed; padding: 7px 8px; v
 th { color: #57606a; font-weight: 600; background: #f8f9fa; }
 .table-wrap { overflow-x: auto; }
 .table-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.table-head .inline { flex: 0 0 330px; }
+.offer-add { flex: 0 0 360px; }
+.offer-add .inline { flex-wrap: wrap; }
+.offer-add .inline button { white-space: nowrap; }
 
 .campaign-head { margin-top: 16px; padding-top: 12px; border-top: 1px solid #e8eaed; }
 .campaign-head h3 { margin-top: 0; }

@@ -147,15 +147,35 @@ def test_unknown_offer_falls_back_to_single_offer_endpoint(client, session):
     assert added["offer_name"] == "Fallback" and added["name_unavailable"] is False
 
 
-def test_add_missing_offer_404(client, session):
+def test_add_missing_offer_uses_arbitrary_id_placeholder(client, session):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         mock_offers(m)
         m.get("offers/99999").respond(404, json={"error": "not found"})
         r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
 
-    assert r.status_code == 404 and r.json()["code"] == "KEITARO_NOT_FOUND"
-    assert session.get(models.CampaignFlow, f.id).revision == 3
+    assert r.status_code == 200, r.text
+    added = offer_of(flow_of(r.json()), 99999)
+    assert added["offer_name"] == "99999" and added["name_unavailable"] is True
+    assert session.get(models.CampaignFlow, f.id).revision == 4
+
+
+def test_arbitrary_offer_supports_share_and_fixed(client, session):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_offers(m)
+        m.get("offers/99999").respond(404, json={"error": "not found"})
+        added = client.post(
+            f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH
+        )
+    assert added.status_code == 200, added.text
+
+    url = f"/api/campaigns/{c.id}/flows/{f.id}/offers/99999"
+    patched = client.patch(url, json={"share": 30}, auth=AUTH)
+    assert patched.status_code == 200, patched.text
+    flow = flow_of(patched.json())
+    assert shares(flow) == {18813: 42, 20001: 28, 99999: 30}
+    assert offer_of(flow, 99999)["is_fixed"] is True
 
 
 def test_delete_then_restore(client, session):
@@ -233,7 +253,8 @@ def test_fixed_toggle_recalculates(client, session):
 
 
 @pytest.mark.parametrize("schema,state", [("redirect", "active"), ("landings", "disabled")])
-def test_readonly_flow_rejects_all_mutations(client, session, schema, state):
+def test_readonly_flow_allows_all_mutations(client, session, schema, state):
+    """Демо-флага больше нет: мутации разрешены для всех потоков."""
     c, f = make_campaign(session, schema=schema, offers=[
         dict(koi=18813, name="Flexacil", share=100, fixed=False, active=True, state=state),
     ])
@@ -247,29 +268,9 @@ def test_readonly_flow_rejects_all_mutations(client, session, schema, state):
             client.patch(f"{base}/offers/18813", json={"share": 50}, auth=AUTH),
         ]
 
-    assert all(r.status_code == 422 and r.json()["code"] == "FLOW_READONLY" for r in results)
-    assert session.get(models.CampaignFlow, f.id).revision == 3
-
-
-def test_readonly_flow_mutations_allowed_with_demo_flag(client, session):
-    """По просьбе владельца: UI может снять FLOW_READONLY для проверки функционала."""
-    c, f = make_campaign(session, schema="redirect", offers=[
-        dict(koi=18813, name="Flexacil", share=100, fixed=False, active=True, state="disabled"),
-    ])
-    base = f"/api/campaigns/{c.id}/flows/{f.id}"
-    with respx.mock(base_url=BASE, assert_all_called=False) as m:
-        mock_offers(m)
-        denied = client.post(f"{base}/offers", json={"offer_id": 40004}, auth=AUTH)
-        added = client.post(
-            f"{base}/offers?allow_readonly=true", json={"offer_id": 40004}, auth=AUTH
-        )
-
-    assert denied.status_code == 422 and denied.json()["code"] == "FLOW_READONLY"
-    assert added.status_code == 200, added.text
-    flow = flow_of(added.json())
-    assert 40004 in shares(flow)
-    assert flow["shares_valid"] is True
-    assert session.get(models.CampaignFlow, f.id).revision == 4
+    assert all(r.status_code == 200 for r in results), [r.text for r in results]
+    assert shares(flow_of(results[-1].json())) == {18813: 50, 40004: 50}
+    assert session.get(models.CampaignFlow, f.id).revision == 7
 
 
 def test_fixed_sum_exceeds_100_rejected(client, session):

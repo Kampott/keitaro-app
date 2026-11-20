@@ -24,6 +24,7 @@ DOMAIN = {"id": 1813, "name": "kylovoa.com", "is_ssl": True, "state": "active"}
 GROUP = {"id": 10489, "name": "Grp", "type": "campaigns"}
 SOURCE = {"id": 836, "name": "FORTESTS", "state": "active"}
 OFFER = {"id": 18813, "name": "Flexacil", "state": "active"}
+OFFER2 = {"id": 20002, "name": "Second Offer", "state": "active"}
 CAMPAIGN = {"id": 216228, "name": "AU promo", "alias": "abc123xy", "group_id": 10489, "traffic_source_id": 836}
 STREAMS = [
     {"id": 1329001, "name": "GEO to Google", "schema": "redirect", "type": "regular",
@@ -45,11 +46,11 @@ def client(session):
         app.dependency_overrides.clear()
 
 
-def mock_catalog(m):
+def mock_catalog(m, offers=None):
     m.get("domains").respond(json=[DOMAIN])
     m.get("groups", params={"type": "campaigns"}).respond(json=[GROUP])
     m.get("traffic_sources").respond(json=[SOURCE])
-    m.get("offers").respond(json=[OFFER])
+    m.get("offers").respond(json=[OFFER] if offers is None else offers)
 
 
 def mock_fetch(m, *, streams=None, campaign=None):
@@ -96,6 +97,51 @@ def test_create_happy_path(client, session, monkeypatch):
     assert all(f.sync_status == "synced" and f.remote_hash for f in row.flows)
     assert [(o.keitaro_offer_id, o.share, o.is_fixed) for o in row.flows[1].offers] == [(18813, 100, False)]
     assert len(session.scalars(select(models.SyncLog).where(models.SyncLog.campaign_id == row.id)).all()) == 2
+
+
+def test_create_multiple_offers(client, session, monkeypatch):
+    import json
+
+    monkeypatch.setattr(campaign_service, "_new_alias", lambda: "abc123xy")
+    streams = [
+        STREAMS[0],
+        {**STREAMS[1], "offers": [
+            {"offer_id": 18813, "share": 50, "state": "active"},
+            {"offer_id": 20002, "share": 50, "state": "active"},
+        ]},
+    ]
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_catalog(m, offers=[OFFER, OFFER2])
+        m.post("campaigns").respond(json=CAMPAIGN)
+        post_streams = m.post("streams").mock(side_effect=[
+            httpx.Response(200, json=streams[0]), httpx.Response(200, json=streams[1]),
+        ])
+        mock_fetch(m, streams=streams)
+        r = client.post("/api/campaigns", json={**PAYLOAD, "offer_ids": [18813, 20002]}, auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert [(o["id"], o["name"]) for o in data["offers"]] == [
+        (18813, "Flexacil"), (20002, "Second Offer"),
+    ]
+    assert data["offer"]["id"] == 18813  # обратная совместимость
+    f2 = json.loads(post_streams.calls[1].request.content)
+    assert f2["offers"] == [
+        {"offer_id": 18813, "share": 50, "state": "active"},
+        {"offer_id": 20002, "share": 50, "state": "active"},
+    ]
+    row = session.scalar(select(models.Campaign).where(models.Campaign.keitaro_id == 216228))
+    assert [(o.keitaro_offer_id, o.share) for o in row.flows[1].offers] == [
+        (18813, 50), (20002, 50),
+    ]
+
+
+def test_duplicate_offer_ids_rejected(client):
+    with respx.mock(base_url=BASE, assert_all_called=False):
+        r = client.post(
+            "/api/campaigns", json={**PAYLOAD, "offer_ids": [18813, 18813]}, auth=AUTH
+        )
+    assert r.status_code == 422
 
 
 def test_geo_normalized_and_deduped(client, monkeypatch):

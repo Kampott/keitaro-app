@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.schemas.campaign import CampaignCreateRequest, CampaignCreateResult, StreamResult
-from app.schemas.catalog import DomainItem, ReferenceItem
+from app.schemas.catalog import DomainItem, OfferItem, ReferenceItem
 from app.services import sync_service
 from app.services.catalog_service import CatalogService
 from app.services.keitaro_client import KeitaroClient
+from app.services.share_calculator import OfferInput, calculate_shares
 
 _ALPHABET = string.ascii_lowercase + string.digits
 _ALIAS_RETRIES = 3
@@ -54,7 +55,7 @@ def _flow1(campaign_id: int, geo: list[str], redirect_url: str) -> dict:
     }
 
 
-def _flow2(campaign_id: int, offer_id: int) -> dict:
+def _flow2(campaign_id: int, offers: list[dict]) -> dict:
     return {
         "campaign_id": campaign_id,
         "name": "Offer",
@@ -64,8 +65,20 @@ def _flow2(campaign_id: int, offer_id: int) -> dict:
         "position": 2,
         "state": "active",
         "collect_clicks": True,
-        "offers": [{"offer_id": offer_id, "share": 100, "state": "active"}],
+        "offers": offers,
     }
+
+
+def _offer_payload(offers: list[OfferItem]) -> list[dict]:
+    """Справедливое целое распределение 100% между всеми выбранными офферами."""
+    shares = {
+        row.id: row.share
+        for row in calculate_shares([OfferInput(id=offer.id, share=0) for offer in offers])
+    }
+    return [
+        {"offer_id": offer.id, "share": shares[offer.id], "state": "active"}
+        for offer in offers
+    ]
 
 
 def _recover_by_alias(client: KeitaroClient, alias: str) -> dict:
@@ -159,7 +172,7 @@ def _require(items, item_id: int, field: str):
 
 def _result(
     *, info: dict, domain: DomainItem, group: ReferenceItem, source: ReferenceItem,
-    offer: ReferenceItem, streams: list[dict], local_sync_failed: bool = False,
+    offers: list[OfferItem], streams: list[dict], local_sync_failed: bool = False,
     warning: str | None = None,
 ) -> CampaignCreateResult:
     return CampaignCreateResult(
@@ -171,7 +184,8 @@ def _result(
         domain=domain,
         group=group,
         source=source,
-        offer=offer,
+        offers=offers,
+        offer=offers[0],
         geo=info["geo"],
         streams=[
             StreamResult(id=int(s["id"]), name=str(s.get("name") or ""),
@@ -190,12 +204,18 @@ def create_campaign(
     domain = _require(catalog.domains(), payload.domain_id, "domain_id")
     group = _require(catalog.groups(), payload.group_id, "group_id")
     source = _require(catalog.sources(), payload.source_id, "source_id")
-    offer = catalog.find_offer(payload.offer_id)
-    if offer is None:
-        raise AppError(
-            "INVALID_REFERENCE", f"Не найден активный offer_id={payload.offer_id}", 422,
-            details={"field": "offer_id", "id": payload.offer_id},
-        )
+    offers: list[OfferItem] = []
+    offer_names: dict[int, str] = {}
+    for offer_id in payload.offer_ids or []:
+        offer = catalog.find_offer(offer_id)
+        if offer is None:
+            raise AppError(
+                "INVALID_REFERENCE", f"Не найден активный offer_id={offer_id}", 422,
+                details={"field": "offer_id", "id": offer_id},
+            )
+        offers.append(offer)
+        offer_names[offer.id] = offer.name
+    offer_payload = _offer_payload(offers)
 
     # 2–3. Alias и POST /campaigns (с повтором только при ошибке по alias)
     last_alias_error: AppError | None = None
@@ -239,13 +259,13 @@ def create_campaign(
         "domain_id": payload.domain_id,
         "group_id": payload.group_id,
         "source_id": payload.source_id,
-        "offer_names": {offer.id: offer.name},
+        "offer_names": offer_names,
     }
     redirect_url = get_settings().google_redirect_url
 
     # 4. Два потока последовательно, без автоповтора
     streams_created: list[dict] = []
-    for body in (_flow1(keitaro_id, payload.geo, redirect_url), _flow2(keitaro_id, payload.offer_id)):
+    for body in (_flow1(keitaro_id, payload.geo, redirect_url), _flow2(keitaro_id, offer_payload)):
         try:
             stream = client.request("POST", "streams", json=body)
         except AppError as e:
@@ -270,7 +290,7 @@ def create_campaign(
         ) from e
     except sync_service.RemoteReadError:
         return _result(
-            info=info, domain=domain, group=group, source=source, offer=offer,
+            info=info, domain=domain, group=group, source=source, offers=offers,
             streams=streams_created, local_sync_failed=True,
             warning="Кампания создана в Keitaro, но прочитать её для локальной копии не удалось. Выполните Fetch в Edit Campaign.",
         )
@@ -280,11 +300,11 @@ def create_campaign(
         sync_service.store_campaign(session, remote, active, info=info, operation="create")
     except sync_service.LocalStoreError as e:
         return _result(
-            info=info, domain=domain, group=group, source=source, offer=offer,
+            info=info, domain=domain, group=group, source=source, offers=offers,
             streams=active, local_sync_failed=True,
             warning=f"Кампания создана в Keitaro, локальная копия не подготовлена: {e}",
         )
 
     return _result(
-        info=info, domain=domain, group=group, source=source, offer=offer, streams=active,
+        info=info, domain=domain, group=group, source=source, offers=offers, streams=active,
     )

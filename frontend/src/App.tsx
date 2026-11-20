@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, describeError, registerUnauthorized, setBasicAuth } from "./api";
+import { registerUnauthorized, setBasicAuth } from "./api";
 import CreateCampaign from "./components/CreateCampaign";
 import EditCampaign from "./components/EditCampaign";
 import type { Notify } from "./types";
 
-type Check = { label: string; state: "loading" | "ok" | "error"; text: string };
 type Toast = { id: number; kind: "success" | "error" | "info"; text: string };
-
-async function check(label: string, url: string, okText: (body: any) => string): Promise<Check> {
-  try {
-    const body = await api<any>(url);
-    return { label, state: "ok", text: okText(body) };
-  } catch (error) {
-    return { label, state: "error", text: describeError(error) };
-  }
-}
 
 function LoginForm({ onDone }: { onDone: () => void }) {
   const [username, setUsername] = useState("");
@@ -46,7 +36,6 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 
 export default function App() {
   const [tab, setTab] = useState<"create" | "edit">("create");
-  const [checks, setChecks] = useState<Check[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [appKey, setAppKey] = useState(0);
@@ -57,30 +46,13 @@ export default function App() {
     window.setTimeout(() => setToasts((current) => current.filter((item) => item.id !== id)), 6000);
   }, []);
 
-  const runChecks = useCallback(() => {
-    setChecks([
-      { label: "Backend + БД", state: "loading", text: "" },
-      { label: "Keitaro", state: "loading", text: "" },
-    ]);
-    (async () => {
-      const health = await check("Backend + БД", "/healthz", (body) =>
-        body.db ? "ok" : "backend жив, БД недоступна");
-      setChecks([health, { label: "Keitaro", state: "loading", text: "" }]);
-      const ping = await check("Keitaro", "/api/keitaro/ping", (body) =>
-        `ключ принят, кампаний в выборке: ${body.campaigns_returned}`);
-      setChecks([health, ping]);
-    })();
-  }, []);
-
   useEffect(() => {
     registerUnauthorized(() => setNeedsAuth(true));
-    runChecks();
-  }, [runChecks]);
+  }, []);
 
   function loginDone() {
     setNeedsAuth(false);
     setAppKey((key) => key + 1); // перемонтируем формы, чтобы повторить загрузку данных
-    runChecks();
   }
 
   return (
@@ -98,15 +70,6 @@ export default function App() {
       {tab === "create"
         ? <CreateCampaign key={`create-${appKey}`} notify={notify} />
         : <EditCampaign key={`edit-${appKey}`} notify={notify} />}
-
-      <section className="card">
-        <b>Статус</b>
-        {checks.map((item) => (
-          <p key={item.label} className={item.state === "ok" ? "ok" : item.state === "error" ? "err" : "muted"}>
-            {item.state === "ok" ? "✓" : item.state === "error" ? "✗" : "…"} {item.label}: {item.text}
-          </p>
-        ))}
-      </section>
 
       <div className="toasts">
         {toasts.map((toast) => (

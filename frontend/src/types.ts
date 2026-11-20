@@ -33,6 +33,7 @@ export type CampaignCreateResult = {
   domain: ReferenceItem;
   group: ReferenceItem;
   source: ReferenceItem;
+  offers: OfferItem[];
   offer: OfferItem;
   geo: string[];
   streams: StreamResult[];

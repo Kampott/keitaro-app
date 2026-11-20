@@ -66,18 +66,6 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-/** Демо-режим: явно разрешить мутации READ_ONLY-потоков (только по флагу UI). */
-export function withDemo(path: string, enabled: boolean): string {
-  if (!enabled) return path;
-  const hashAt = path.indexOf("#");
-  const base = hashAt === -1 ? path : path.slice(0, hashAt);
-  const hash = hashAt === -1 ? "" : path.slice(hashAt);
-  const separator = base.includes("?")
-    ? (base.endsWith("?") || base.endsWith("&") ? "" : "&")
-    : "?";
-  return `${base}${separator}allow_readonly=true${hash}`;
-}
-
 export function describeError(error: unknown): string {
   if (error instanceof ApiError) {
     return error.code === "NETWORK" ? error.message : `${error.code}: ${error.message}`;

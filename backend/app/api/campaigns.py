@@ -67,19 +67,12 @@ def add_offer(
     campaign_id: int,
     flow_id: int,
     body: OfferAddRequest,
-    allow_readonly: bool = False,
     client: KeitaroClient = Depends(get_keitaro),
     catalog: CatalogService = Depends(get_catalog),
     session: Session = Depends(get_db),
 ):
-    """§4.4: добавить оффер в поток (из каталога или из Deleted Offers).
-
-    `allow_readonly=true` — демо-режим: разрешает мутации читаемых потоков (§4.2).
-    """
-    return offer_service.add_offer(
-        client, catalog, session, campaign_id, flow_id, body.offer_id,
-        allow_readonly=allow_readonly,
-    )
+    """§4.4: добавить оффер в поток (из каталога, из Deleted Offers или по произвольному ID)."""
+    return offer_service.add_offer(client, catalog, session, campaign_id, flow_id, body.offer_id)
 
 
 @router.delete("/{campaign_id}/flows/{flow_id}/offers/{offer_id}", response_model=CampaignDetail)
@@ -87,13 +80,10 @@ def delete_offer(
     campaign_id: int,
     flow_id: int,
     offer_id: int,
-    allow_readonly: bool = False,
     session: Session = Depends(get_db),
 ):
     """§4.5: мягко удалить оффер в Deleted Offers."""
-    return offer_service.delete_offer(
-        session, campaign_id, flow_id, offer_id, allow_readonly=allow_readonly
-    )
+    return offer_service.delete_offer(session, campaign_id, flow_id, offer_id)
 
 
 @router.post(
@@ -103,13 +93,10 @@ def restore_offer(
     campaign_id: int,
     flow_id: int,
     offer_id: int,
-    allow_readonly: bool = False,
     session: Session = Depends(get_db),
 ):
     """§4.5: восстановить оффер из Deleted Offers."""
-    return offer_service.restore_offer(
-        session, campaign_id, flow_id, offer_id, allow_readonly=allow_readonly
-    )
+    return offer_service.restore_offer(session, campaign_id, flow_id, offer_id)
 
 
 @router.patch("/{campaign_id}/flows/{flow_id}/offers/{offer_id}", response_model=CampaignDetail)
@@ -118,11 +105,10 @@ def patch_offer(
     flow_id: int,
     offer_id: int,
     body: OfferPatchRequest,
-    allow_readonly: bool = False,
     session: Session = Depends(get_db),
 ):
     """§4.6: задать share (D1: становится Fixed) или переключить Fixed."""
     return offer_service.patch_offer(
         session, campaign_id, flow_id, offer_id,
-        share=body.share, is_fixed=body.is_fixed, allow_readonly=allow_readonly,
+        share=body.share, is_fixed=body.is_fixed,
     )

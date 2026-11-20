@@ -8,7 +8,6 @@ from app.core.errors import AppError
 from app.db import models
 from app.services import editor_service, sync_service
 from app.services.keitaro_client import KeitaroClient
-from app.services.offer_service import _assert_editable
 from app.services.share_calculator import shares_valid
 
 
@@ -102,16 +101,12 @@ def upload_flow(
     flow_id: int,
     *,
     force: bool = False,
-    allow_readonly: bool = False,
 ):
     """§4.9: отправить снимок активных офферов и подтвердить результат чтением."""
     flow = _flow_or_404(session, flow_id)
     campaign_id = flow.campaign_id
     keitaro_flow_id = flow.keitaro_flow_id
     campaign = session.get(models.Campaign, campaign_id)
-    _assert_editable(
-        session, flow, allow_readonly=allow_readonly
-    )  # FLOW_READONLY: Upload read-only потока запрещён, кроме демо-режима
 
     # 1. Сетевые проверки до захвата локальных блокировок.
     try:
@@ -148,7 +143,6 @@ def upload_flow(
         )
         if locked.sync_status == "uploading":
             raise AppError("BUSY", "Поток уже отправляется", 409, details={"flow_id": flow_id})
-        _assert_editable(session, locked, allow_readonly=allow_readonly)
         rows = _active_offers(session, flow_id)
         if not rows:
             raise AppError("EMPTY_FLOW", "В потоке нет активных офферов", 422)

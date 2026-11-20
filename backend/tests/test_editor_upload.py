@@ -156,20 +156,16 @@ def test_upload_happy_path_partial_put(client, session):
     assert len(logs) == 1 and logs[0].status == "success"
 
 
-def test_upload_readonly_flow_allowed_with_demo_flag(client, session):
+def test_upload_readonly_flow_allowed(client, session):
     c, f = make_campaign(session, schema="redirect")
     remote = Remote()
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         remote.install(m)
-        denied = client.post(f"/api/flows/{f.id}/upload", json={}, auth=AUTH)
-        allowed = client.post(
-            f"/api/flows/{f.id}/upload?allow_readonly=true", json={}, auth=AUTH
-        )
+        uploaded = client.post(f"/api/flows/{f.id}/upload", json={}, auth=AUTH)
 
-    assert denied.status_code == 422 and denied.json()["code"] == "FLOW_READONLY"
-    assert allowed.status_code == 200, allowed.text
+    assert uploaded.status_code == 200, uploaded.text
     assert len(remote.puts) == 1
-    assert flow_of(allowed.json())["sync_status"] == "synced"
+    assert flow_of(uploaded.json())["sync_status"] == "synced"
 
 
 def test_remote_changed_requires_force(client, session):
@@ -247,20 +243,6 @@ def test_busy_upload_rejected(client, session):
     assert r.status_code == 409 and r.json()["code"] == "BUSY"
     assert remote.puts == []
     assert session.get(models.CampaignFlow, f.id).sync_status == "uploading"
-
-
-@pytest.mark.parametrize("schema,state", [("redirect", "active"), ("landings", "disabled")])
-def test_readonly_flow_upload_rejected(client, session, schema, state):
-    c, f = make_campaign(session, schema=schema, offers=[
-        dict(koi=18813, share=100, state=state, active=True),
-    ])
-    with respx.mock(base_url=BASE, assert_all_called=False) as m:
-        remote = Remote()
-        remote.install(m)
-        r = client.post(f"/api/flows/{f.id}/upload", json={}, auth=AUTH)
-        assert all(route.call_count == 0 for route in m.routes)
-
-    assert r.status_code == 422 and r.json()["code"] == "FLOW_READONLY"
 
 
 def test_verify_failure_marks_error_and_keeps_local_data(client, session):

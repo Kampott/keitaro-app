@@ -7,6 +7,8 @@ import type {
 
 type Props = { notify: Notify };
 
+const MAX_CREATE_OFFERS = 20;
+
 export default function CreateCampaign({ notify }: Props) {
   const [countries, setCountries] = useState<Country[]>([]);
   const [domains, setDomains] = useState<DomainItem[]>([]);
@@ -15,16 +17,17 @@ export default function CreateCampaign({ notify }: Props) {
   const [geoSearch, setGeoSearch] = useState("");
   const [offerSearch, setOfferSearch] = useState("");
   const [offers, setOffers] = useState<OfferItem[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [selectedOffers, setSelectedOffers] = useState<OfferItem[]>([]);
   const [newGroup, setNewGroup] = useState("");
   const [form, setForm] = useState({
     name: "",
     geo: [] as string[],
-    offerId: 0,
+    offerIds: [] as number[],
     domainId: 0,
     groupId: 0,
     sourceId: 0,
   });
-  const [selectedOffer, setSelectedOffer] = useState<OfferItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<CampaignCreateResult | null>(null);
 
@@ -59,19 +62,17 @@ export default function CreateCampaign({ notify }: Props) {
     };
   }, [notify]);
 
-  // Пустой/короткий запрос не дёргает Keitaro: список офферов большой.
+  // Список офферов показываем сразу при фокусе/пустом поиске: так autocomplete
+  // действительно всплывает, а не требует двух символов. Backend кэширует ответ.
   useEffect(() => {
     const term = offerSearch.trim();
-    if (!/^\d+$/.test(term) && term.length < 2) {
-      setOffers([]);
-      return;
-    }
     let cancelled = false;
     const controller = new AbortController();
+    setOffersLoading(true);
     const timer = window.setTimeout(async () => {
       try {
         const rows = await api<OfferItem[]>(
-          `/api/keitaro/offers${query({ search: term, limit: 20 })}`,
+          `/api/keitaro/offers${query({ search: term, limit: MAX_CREATE_OFFERS })}`,
           { signal: controller.signal },
         );
         if (!cancelled) setOffers(rows);
@@ -79,8 +80,10 @@ export default function CreateCampaign({ notify }: Props) {
         if (!cancelled && !(error instanceof ApiError && error.code === "NETWORK" && controller.signal.aborted)) {
           notify("error", `Офферы недоступны: ${describeError(error)}`);
         }
+      } finally {
+        if (!cancelled) setOffersLoading(false);
       }
-    }, 250);
+    }, 150);
     return () => {
       cancelled = true;
       controller.abort();
@@ -109,6 +112,26 @@ export default function CreateCampaign({ notify }: Props) {
     }));
   }
 
+  function addSelectedOffer(offer: OfferItem) {
+    setSelectedOffers((current) =>
+      current.some((item) => item.id === offer.id) ? current : [...current, offer],
+    );
+    setForm((current) => ({
+      ...current,
+      offerIds: current.offerIds.includes(offer.id) ? current.offerIds : [...current.offerIds, offer.id],
+    }));
+    setOfferSearch("");
+    setOffers([]);
+  }
+
+  function removeSelectedOffer(offerId: number) {
+    setSelectedOffers((current) => current.filter((item) => item.id !== offerId));
+    setForm((current) => ({
+      ...current,
+      offerIds: current.offerIds.filter((id) => id !== offerId),
+    }));
+  }
+
   async function createGroup() {
     const name = newGroup.trim();
     if (!name || busy) return;
@@ -132,8 +155,8 @@ export default function CreateCampaign({ notify }: Props) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return; // защита от двойного клика (§3.5)
-    if (!form.name.trim() || !form.geo.length || !form.offerId || !form.domainId || !form.groupId || !form.sourceId) {
-      notify("error", "Заполните Name, GEO, Offer, Domain, Group и Source");
+    if (!form.name.trim() || !form.geo.length || !form.offerIds.length || !form.domainId || !form.groupId || !form.sourceId) {
+      notify("error", "Заполните Name, GEO, хотя бы один Offer, Domain, Group и Source");
       return;
     }
     setBusy("create");
@@ -144,7 +167,7 @@ export default function CreateCampaign({ notify }: Props) {
         body: JSON.stringify({
           name: form.name.trim(),
           geo: form.geo,
-          offer_id: form.offerId,
+          offer_ids: form.offerIds,
           domain_id: form.domainId,
           group_id: form.groupId,
           source_id: form.sourceId,
@@ -210,50 +233,44 @@ export default function CreateCampaign({ notify }: Props) {
           </div>
 
           <div className="field">
-            <span>Offer * (autocomplete)</span>
-            {selectedOffer && (
-              <div className="selected">
-               Выбрано: #{selectedOffer.id} — {selectedOffer.name}{" "}
-               <button
-                  type="button"
-                  className="link"
-                  onClick={() => {
-                    setSelectedOffer(null);
-                    setForm((current) => ({ ...current, offerId: 0 }));
-                    setOfferSearch("");
-                    setOffers([]);
-                  }}
-                >
-                  сменить
-                </button>
+            <span>Offers * (можно выбрать несколько, до {MAX_CREATE_OFFERS})</span>
+            {!!selectedOffers.length && (
+              <div className="chips">
+                {selectedOffers.map((offer) => (
+                  <button
+                    key={offer.id}
+                    type="button"
+                    className="chip"
+                    onClick={() => removeSelectedOffer(offer.id)}
+                    title="Убрать оффер"
+                  >
+                    #{offer.id} — {offer.name} ×
+                  </button>
+                ))}
               </div>
             )}
-            {!selectedOffer && (
-              <>
-                <input
-                  value={offerSearch}
-                  onChange={(event) => setOfferSearch(event.target.value)}
-                  placeholder="Название или ID оффера"
-                />
-                <div className="suggestions">
-                  {offers.map((offer) => (
-                    <button
-                      key={offer.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedOffer(offer);
-                        setForm((current) => ({ ...current, offerId: offer.id }));
-                        setOfferSearch("");
-                        setOffers([]);
-                      }}
-                    >
-                      #{offer.id} — {offer.name}
-                    </button>
-                  ))}
-                  {!offers.length && <span className="muted">Ничего не найдено</span>}
-                </div>
-              </>
-            )}
+            <input
+              value={offerSearch}
+              onChange={(event) => setOfferSearch(event.target.value)}
+              placeholder="Название или ID оффера; список появится сразу"
+            />
+            <div className="suggestions">
+              {offersLoading && <span className="muted">Загрузка каталога…</span>}
+              {!offersLoading && offers.map((offer) => (
+                <button
+                  key={offer.id}
+                  type="button"
+                  disabled={selectedOffers.length >= MAX_CREATE_OFFERS}
+                  onClick={() => addSelectedOffer(offer)}
+                >
+                  + #{offer.id} — {offer.name}
+                </button>
+              ))}
+              {!offersLoading && !offers.length && <span className="muted">Ничего не найдено</span>}
+              {selectedOffers.length >= MAX_CREATE_OFFERS && (
+                <span className="muted">Достигнут лимит в {MAX_CREATE_OFFERS} офферов</span>
+              )}
+            </div>
           </div>
 
           <label className="field">
@@ -311,7 +328,7 @@ export default function CreateCampaign({ notify }: Props) {
             <p>Domain: {result.domain.name} (#{result.domain.id})</p>
             <p>Group: {result.group.name} (#{result.group.id})</p>
             <p>Source: {result.source.name} (#{result.source.id})</p>
-            <p>Offer: {result.offer.name} (#{result.offer.id})</p>
+            <p>Offers: {result.offers.map((offer) => `#${offer.id} — ${offer.name}`).join("; ")}</p>
             <p>GEO: {result.geo.join(", ")}</p>
             <h3>Потоки</h3>
             <table>
