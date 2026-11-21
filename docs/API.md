@@ -170,6 +170,18 @@ curl -u "$APP_BASIC_AUTH_USER:$APP_BASIC_AUTH_PASSWORD" \
 
 `status` всегда `ok`; смотрите флаги `db` и `keitaro_configured`. Значение `db=false` означает, что контейнер backend запущен, но БД недоступна.
 
+### Режим приложения
+
+#### `GET /api/config`
+
+Отдаёт интерфейсу рабочий флаг; в production требует Basic auth.
+
+```json
+{"allow_arbitrary_offer_ids": false}
+```
+
+`true` только при `APP_ENV=development`. При `false` frontend не показывает вариант «Добавить оффер #ID», а backend отклоняет такие запросы.
+
 ### Справочники и Keitaro
 
 #### `GET /api/geo`
@@ -289,9 +301,9 @@ curl -u "$APP_BASIC_AUTH_USER:$APP_BASIC_AUTH_PASSWORD" \
 
 Добавляет оффер в поток или восстанавливает его из архива. Тело: `{"offer_id": 42}`. Ответ: `CampaignDetail`.
 
-Произвольный положительный ID принимается, даже если оффера нет в каталоге: название подставляется из ID и помечается `name_unavailable: true`. Название ищется по возможности: сначала кэш `GET /offers`, затем `GET /offers/{id}`; любая ошибка Keitaro на этом этапе (включая `KEITARO_AUTH` и недоступность сети) не блокирует добавление. Строгая проверка существования оффера остаётся только при создании кампании.
+Произвольный положительный ID принимается только при `APP_ENV=development`: если оффера нет в каталоге, название подставляется из ID и помечается `name_unavailable: true`. Название ищется по возможности — сначала кэш `GET /offers`, затем `GET /offers/{id}`; в development ошибка поиска (включая `KEITARO_AUTH` и недоступность сети) не блокирует добавление. В production принимаются только активные офферы из каталога: неизвестный ID или недоступный каталог дают `INVALID_REFERENCE` (422).
 
-Ошибки самой операции: `NOT_FOUND`, `DUPLICATE_OFFER` (уже активен). При создании кампании ошибки каталога возвращаются как `KEITARO_*`.
+Ошибки операции: `NOT_FOUND`, `INVALID_REFERENCE`, `DUPLICATE_OFFER` (уже активен). При создании кампании ошибки каталога возвращаются как `KEITARO_*`.
 
 #### `DELETE /api/campaigns/{campaign_id}/flows/{flow_id}/offers/{offer_id}`
 

@@ -54,6 +54,15 @@ def env(monkeypatch):
     _reset()
 
 
+@pytest.fixture
+def dev_env(monkeypatch, env):
+    """Локальный режим: разрешены произвольные Offer ID в Editor."""
+    monkeypatch.setenv("APP_ENV", "development")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 def _test_database_url() -> str:
     """Отдельная тестовая БД PostgreSQL: <DATABASE_URL>_test или TEST_DATABASE_URL."""
     explicit = os.environ.get("TEST_DATABASE_URL", "").strip()

@@ -17,6 +17,7 @@ def _optional_id(value: str) -> int | None:
 @dataclass(frozen=True)
 class Settings:
     app_env: str
+    allow_arbitrary_offer_ids: bool
     database_url: str
     keitaro_base_url: str
     keitaro_api_key: str
@@ -31,8 +32,11 @@ class Settings:
 @lru_cache
 def get_settings() -> Settings:
     e = os.environ.get
+    app_env = e("APP_ENV", "production")
     s = Settings(
-        app_env=e("APP_ENV", "production"),
+        app_env=app_env,
+        # Произвольные Offer ID — только для локальной проверки в development.
+        allow_arbitrary_offer_ids=app_env == "development",
         database_url=e("DATABASE_URL", ""),
         keitaro_base_url=e("KEITARO_BASE_URL", "").strip().rstrip("/"),
         keitaro_api_key=e("KEITARO_API_KEY", "").strip(),

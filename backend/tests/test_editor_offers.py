@@ -148,7 +148,7 @@ def test_unknown_offer_falls_back_to_single_offer_endpoint(client, session):
     assert added["offer_name"] == "Fallback" and added["name_unavailable"] is False
 
 
-def test_add_missing_offer_uses_arbitrary_id_placeholder(client, session):
+def test_add_missing_offer_uses_arbitrary_id_placeholder(client, session, dev_env):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         mock_offers(m)
@@ -162,7 +162,7 @@ def test_add_missing_offer_uses_arbitrary_id_placeholder(client, session):
 
 
 @pytest.mark.parametrize("status", [401, 403])
-def test_arbitrary_offer_added_when_single_lookup_denied(client, session, status):
+def test_arbitrary_offer_added_when_single_lookup_denied(client, session, status, dev_env):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         mock_offers(m)
@@ -175,7 +175,7 @@ def test_arbitrary_offer_added_when_single_lookup_denied(client, session, status
     assert added["offer_name"] == "99999" and added["name_unavailable"] is True
 
 
-def test_arbitrary_offer_added_when_offers_list_denied(client, session):
+def test_arbitrary_offer_added_when_offers_list_denied(client, session, dev_env):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         offers = m.get("offers").respond(403, json={"error": "Forbidden"})
@@ -202,7 +202,36 @@ def test_offer_name_resolved_when_list_denied_but_single_ok(client, session):
     assert added["offer_name"] == "Fallback" and added["name_unavailable"] is False
 
 
-def test_arbitrary_offer_supports_share_and_fixed(client, session):
+def test_production_rejects_arbitrary_offer_id(client, session):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_offers(m)
+        m.get("offers/99999").respond(404, json={"error": "not found"})
+        r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
+
+    assert r.status_code == 422 and r.json()["code"] == "INVALID_REFERENCE"
+    assert r.json()["details"] == {"field": "offer_id", "id": 99999}
+    fresh = session.get(models.CampaignFlow, f.id)
+    assert fresh.revision == 3 and fresh.sync_status == "synced"
+    assert session.scalar(
+        select(models.CampaignOffer).where(
+            models.CampaignOffer.flow_id == f.id,
+            models.CampaignOffer.keitaro_offer_id == 99999,
+        )
+    ) is None
+
+
+def test_production_rejects_arbitrary_id_when_catalog_denies(client, session):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_offers(m)
+        m.get("offers/99999").respond(403, json={"error": "Forbidden"})
+        r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
+
+    assert r.status_code == 422 and r.json()["code"] == "INVALID_REFERENCE"
+
+
+def test_arbitrary_offer_supports_share_and_fixed(client, session, dev_env):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         mock_offers(m)

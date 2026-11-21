@@ -47,6 +47,7 @@ export default function EditCampaign({ notify }: Props) {
   const [offerResults, setOfferResults] = useState<OfferItem[]>([]);
   const [offerReloadNonce, setOfferReloadNonce] = useState(0);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [allowArbitraryIds, setAllowArbitraryIds] = useState(false);
   const [offersOpen, setOffersOpen] = useState(false);
   const [offerActive, setOfferActive] = useState(-1);
   const offerPickerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +93,20 @@ export default function EditCampaign({ notify }: Props) {
   useEffect(() => {
     void refreshLocal();
   }, [refreshLocal]);
+
+  // Произвольные Offer ID доступны только в development; по умолчанию флаг выключен.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await api<{ allow_arbitrary_offer_ids: boolean }>("/api/config");
+        if (!cancelled) setAllowArbitraryIds(cfg.allow_arbitrary_offer_ids);
+      } catch {
+        // Если флаг не загрузился, добавляем только офферы из каталога.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Список нужен один раз: поиск ниже фильтрует его локально, без вызовов Keitaro.
   useEffect(() => {
@@ -166,7 +181,7 @@ export default function EditCampaign({ notify }: Props) {
   const selectedOfferIds = new Set(flow?.offers.map((item) => item.keitaro_offer_id) ?? []);
   const availableOffers = offerResults.filter((item) => !selectedOfferIds.has(item.id));
   const rawCustomId = offerSearch.trim();
-  const customOfferId = /^\d+$/.test(rawCustomId) && Number(rawCustomId) > 0 ? Number(rawCustomId) : null;
+  const customOfferId = allowArbitraryIds && /^\d+$/.test(rawCustomId) && Number(rawCustomId) > 0 ? Number(rawCustomId) : null;
   const customAlreadyAdded = customOfferId !== null && selectedOfferIds.has(customOfferId);
   const customInCatalog = customOfferId !== null && availableOffers.some((item) => item.id === customOfferId);
   const offerOptions: OfferOption[] = [

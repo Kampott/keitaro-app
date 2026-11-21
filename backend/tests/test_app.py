@@ -26,6 +26,22 @@ def test_api_requires_basic_auth_but_healthz_is_open():
     assert h == {"status": "ok", "db": False, "keitaro_configured": True}
 
 
+def test_config_flag_is_off_in_production():
+    with TestClient(app) as c:
+        r = c.get("/api/config", auth=AUTH)
+    assert r.status_code == 200 and r.json() == {"allow_arbitrary_offer_ids": False}
+
+
+def test_config_flag_is_on_in_development(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    get_settings.cache_clear()
+    with TestClient(app) as c:
+        r = c.get("/api/config", auth=AUTH)
+    body = r.json()
+    get_settings.cache_clear()
+    assert r.status_code == 200 and body == {"allow_arbitrary_offer_ids": True}
+
+
 def test_ping_does_not_leak_keitaro_response():
     with respx.mock(base_url="https://k.example/admin_api/v1") as m:
         m.get("campaigns").respond(json=[{"id": 1, "token": "SECRET-TOKEN"}])

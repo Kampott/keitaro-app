@@ -8,7 +8,7 @@
 
 | Переменная | Обязательна | По умолчанию | Назначение |
 |---|---|---|---|
-| `APP_ENV` | нет | `production` | `production` или `development`. В `development` можно работать без Basic auth и доступны `/docs`, `/openapi.json` |
+| `APP_ENV` | нет | `production` | `production` или `development`. В `development` можно работать без Basic auth, доступны `/docs`, `/openapi.json` и произвольные Offer ID в Editor; в `production` добавляются только офферы из каталога |
 | `APP_BASIC_AUTH_USER` | да при `APP_ENV != development` | — | логин для всех `/api/*` |
 | `APP_BASIC_AUTH_PASSWORD` | да при `APP_ENV != development` | — | пароль для всех `/api/*` |
 | `KEITARO_BASE_URL` | да для работы с Keitaro | — | адрес трекера **без** `/admin` и `/admin_api/v1` |
@@ -171,7 +171,7 @@ WRITE-проверки в браузере владелец уже подтве�
 
 1. `/healthz` показывает `db=true`, `keitaro_configured=true`.
 2. В UI открываются справочники и список кампаний Keitaro.
-3. Тесты backend зелёные: `153 passed`.
+3. Тесты backend зелёные: `157 passed`.
 4. Сделан свежий дамп PostgreSQL.
 5. У вас есть разрешение на изменение кампаний в целевом трекере.
 6. Вы понимаете разницу между локальным изменением и отправкой в Keitaro: мутации офферов не уходят в трекер до **Upload to Keitaro**.

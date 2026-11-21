@@ -18,8 +18,8 @@ Adrobot — это тонкий веб-слой над Keitaro Admin API с со
 | Слой | Файлы | Ответственность |
 |---|---|---|
 | Точка входа | `app/main.py` | lifespan, `/healthz`, единый обработчик `AppError`, подключение `/api` с Basic auth |
-| Конфигурация | `app/core/config.py`, `app/core/errors.py` | env-настройки, fail-closed проверка авторизации, формат ошибки |
-| HTTP | `app/api/deps.py`, `app/api/{geo,keitaro,campaigns,flows}.py` | авторизация, DI, маршруты, request/response-схемы |
+| Конфигурация | `app/core/config.py`, `app/core/errors.py` | env-настройки, fail-closed проверка авторизации, флаг произвольных Offer ID по `APP_ENV`, формат ошибки |
+| HTTP | `app/api/deps.py`, `app/api/{config,geo,keitaro,campaigns,flows}.py` | авторизация, DI, маршруты, request/response-схемы |
 | Схемы | `app/schemas/*.py` | валидация входа и формат выхода |
 | Сервисы | `app/services/*.py` | вся бизнес-логика и работа с Keitaro/БД |
 | Данные | `app/db/database.py`, `app/db/models.py` | engine SQLAlchemy 2, ORM-модели и ограничения |
@@ -127,7 +127,7 @@ Nginx проксирует только `/api/` и `/healthz`, остальны�
 
 Add/Delete/Restore/PATCH выполняются под `SELECT ... FOR UPDATE` на потоке, затем пересчитывают shares и увеличивают revision.
 
-- **Add**: оффер из каталога или произвольный ID; новый оффер получает вес как среднее незакреплённых; дубль активного оффера — `DUPLICATE_OFFER`.
+- **Add**: оффер из каталога; произвольный ID — только при `APP_ENV=development` (иначе `INVALID_REFERENCE`). Поиск названия best-effort: кэш `/offers`, затем `/offers/{id}`. Новый оффер получает вес как среднее незакреплённых; дубль активного оффера — `DUPLICATE_OFFER`.
 - **Delete**: мягкое удаление в `deleted_offers`; перед пересчётом все незакреплённые доли сбрасываются, поэтому `34/33/33` становится `50/50`, Fixed сохраняются.
 - **Restore**: оффер возвращается как новый, прежние share и Fixed игнорируются.
 - **PATCH share**: введённое число становится Fixed и «опорной» долей; остальные пересчитываются.

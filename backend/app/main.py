@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import campaigns, flows, geo, keitaro
+from app.api import campaigns, config, flows, geo, keitaro
 from app.api.deps import require_auth
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -58,6 +58,7 @@ def healthz():
 
 
 api = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
+api.include_router(config.router)
 api.include_router(geo.router)
 api.include_router(keitaro.router)
 api.include_router(campaigns.router)

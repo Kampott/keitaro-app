@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db import models
 from app.schemas.editor import CampaignDetail
@@ -125,6 +126,13 @@ def add_offer(
     _flow_or_404(session, campaign_id, flow_id)
 
     found = catalog.get_offer(offer_id)  # сетевой вызов до захвата блокировки
+    if found is None and not get_settings().allow_arbitrary_offer_ids:
+        raise AppError(
+            "INVALID_REFERENCE",
+            f"Активный оффер {offer_id} не найден в каталоге Keitaro",
+            422,
+            details={"field": "offer_id", "id": offer_id},
+        )
     name = found.name if found is not None else str(offer_id)
 
     try:
