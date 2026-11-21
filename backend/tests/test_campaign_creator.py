@@ -180,6 +180,18 @@ def test_unknown_reference_422(client):
     assert r.json()["details"] == {"field": "offer_id", "id": 999}
 
 
+def test_catalog_auth_error_propagates_on_create(client):
+    """Создание кампании проверяет каталог строго: ошибка Keitaro не маскируется."""
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        m.get("domains").respond(json=[DOMAIN])
+        m.get("groups", params={"type": "campaigns"}).respond(json=[GROUP])
+        m.get("traffic_sources").respond(json=[SOURCE])
+        m.get("offers").respond(403, json={"error": "Forbidden"})
+        r = client.post("/api/campaigns", json=PAYLOAD, auth=AUTH)
+
+    assert r.status_code == 502 and r.json()["code"] == "KEITARO_AUTH"
+
+
 def test_name_duplicate_is_not_retried(client):
     with respx.mock(base_url=BASE, assert_all_called=False) as m:
         mock_catalog(m)

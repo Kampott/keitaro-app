@@ -1,6 +1,6 @@
 # Тестирование
 
-Backend-набор: **148 passed**. Тесты используют отдельную PostgreSQL-БД, Keitaro полностью мокируется, живые WRITE-вызовы не выполняются. Frontend проверяется сборкой TypeScript/Vite и вручную в браузере.
+Backend-набор: **153 passed**. Тесты используют отдельную PostgreSQL-БД, Keitaro полностью мокируется, живые WRITE-вызовы не выполняются. Frontend проверяется сборкой TypeScript/Vite и вручную в браузере.
 
 ## Запуск backend-тестов
 
@@ -13,7 +13,7 @@ docker compose run --rm --build backend python -m pytest -q
 Ожидаемый итог:
 
 ```text
-148 passed, 1 warning in 2.78s
+153 passed, 1 warning in 3.21s
 ```
 
 Warning — `StarletteDeprecationWarning` от связки FastAPI TestClient/httpx; на результат не влияет.
@@ -52,12 +52,12 @@ SQLite не используется. Тесты работают только �
 | `test_catalog.py` | 12 | `/api/geo`, defaults, справочники только с `{id,name}`, поиск офферов, кэш 60 с, ошибки Keitaro, создание группы |
 | `test_share_calculator.py` | 45 | все векторы Приложения C при `MIN_SHARE=0` и `1`, приоритет явного аргумента, пустой список, детерминированные остатки, property-тесты |
 | `test_models.py` | 7 | таблицы, UNIQUE/CHECK/FK, мягкое удаление, каскады, `SyncLog` — всё на PostgreSQL |
-| `test_campaign_creator.py` | 17 | POST-тела для одного и нескольких офферов, GEO, дубли, таймаут и поиск по alias, компенсационная архивация, отказ архивировать при сетевой ошибке БД, tracking URL |
+| `test_campaign_creator.py` | 18 | POST-тела для одного и нескольких офферов, GEO, дубли, таймаут и поиск по alias, компенсационная архивация, отказ архивировать при сетевой ошибке БД, строгий проброс ошибки каталога, tracking URL |
 | `test_editor_fetch.py` | 9 | чтение и статусы, force/BUSY, ошибки Keitaro, контроль revision, архивные офферы и потоки |
-| `test_editor_offers.py` | 22 | Add/Delete/Restore/Fixed/PATCH, выравнивание shares после удаления, произвольные Offer ID, `name_unavailable`, мутации «read-only» потоков, ошибки Fixed и блокировки |
+| `test_editor_offers.py` | 26 | Add/Delete/Restore/Fixed/PATCH, выравнивание shares после удаления, произвольные Offer ID, `name_unavailable`, отказ каталога по авторизации при Add, мутации «read-only» потоков, ошибки Fixed и блокировки |
 | `test_editor_selection.py` | 5 | список кампаний Keitaro, лимит 1000 на 205 кампаний, локальный поиск, первый Fetch, кэш 30 с |
 | `test_editor_upload.py` | 14 | partial/full PUT, `REMOTE_CHANGED` и force, `CAMPAIGN_ARCHIVED`, `BUSY`, пустой список офферов, `INVALID_SHARES`, контрольное чтение, error-log, recovery зависших `uploading` |
-| **Итого** | **148** | — |
+| **Итого** | **153** | — |
 
 ## Shares и `MIN_SHARE`
 

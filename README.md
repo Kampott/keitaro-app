@@ -4,7 +4,7 @@
 
 **Стек:** FastAPI, SQLAlchemy, PostgreSQL, React, TypeScript, Docker Compose.
 
-**Проверка:** 148 backend-тестов, успешная сборка frontend. Основные сценарии работы с Keitaro проверены вручную на Keitaro 11.4.
+**Проверка:** 153 backend-теста, успешная сборка frontend. Основные сценарии работы с Keitaro проверены вручную на Keitaro 11.4.
 
 ## Возможности
 

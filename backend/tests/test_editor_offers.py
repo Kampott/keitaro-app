@@ -161,6 +161,47 @@ def test_add_missing_offer_uses_arbitrary_id_placeholder(client, session):
     assert session.get(models.CampaignFlow, f.id).revision == 4
 
 
+@pytest.mark.parametrize("status", [401, 403])
+def test_arbitrary_offer_added_when_single_lookup_denied(client, session, status):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        mock_offers(m)
+        single = m.get("offers/99999").respond(status, json={"error": "Forbidden"})
+        r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    assert single.called
+    added = offer_of(flow_of(r.json()), 99999)
+    assert added["offer_name"] == "99999" and added["name_unavailable"] is True
+
+
+def test_arbitrary_offer_added_when_offers_list_denied(client, session):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        offers = m.get("offers").respond(403, json={"error": "Forbidden"})
+        single = m.get("offers/99999").respond(403, json={"error": "Forbidden"})
+        r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    assert offers.called and single.called
+    added = offer_of(flow_of(r.json()), 99999)
+    assert added["offer_name"] == "99999" and added["name_unavailable"] is True
+
+
+def test_offer_name_resolved_when_list_denied_but_single_ok(client, session):
+    c, f = make_campaign(session)
+    with respx.mock(base_url=BASE, assert_all_called=False) as m:
+        m.get("offers").respond(403, json={"error": "Forbidden"})
+        m.get("offers/99999").respond(
+            json={"id": 99999, "name": "Fallback", "state": "active"}
+        )
+        r = client.post(f"/api/campaigns/{c.id}/flows/{f.id}/offers", json={"offer_id": 99999}, auth=AUTH)
+
+    assert r.status_code == 200, r.text
+    added = offer_of(flow_of(r.json()), 99999)
+    assert added["offer_name"] == "Fallback" and added["name_unavailable"] is False
+
+
 def test_arbitrary_offer_supports_share_and_fixed(client, session):
     c, f = make_campaign(session)
     with respx.mock(base_url=BASE, assert_all_called=False) as m:

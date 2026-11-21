@@ -109,16 +109,23 @@ class CatalogService:
         return None
 
     def get_offer(self, offer_id: int) -> OfferItem | None:
-        """Сначала кэш, при промахе — GET /offers/{id}; только активные офферы."""
-        cached = self.find_offer(offer_id)
+        """Лучшая попытка получить название оффера для Campaign Editor.
+
+        В отличие от find_offer() (строгая проверка при создании кампании),
+        ошибки Keitaro здесь не блокируют добавление: произвольный ID
+        сохраняется с названием из ID и name_unavailable=true. Пробуем оба
+        источника — список из кэша и GET /offers/{id}.
+        """
+        try:
+            cached = self.find_offer(offer_id)
+        except AppError:
+            cached = None
         if cached is not None:
             return cached
         try:
             data = self._client.request("GET", f"offers/{offer_id}")
-        except AppError as e:
-            if e.code == "KEITARO_NOT_FOUND":
-                return None
-            raise
+        except AppError:
+            return None
         if isinstance(data, list):
             data = data[0] if data else None
         if not isinstance(data, dict) or data.get("state") != "active":
